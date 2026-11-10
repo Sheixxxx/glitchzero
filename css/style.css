@@ -355,3 +355,5 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;b
 .relc{width:32px;height:32px;display:grid;place-items:center;font-size:16px;color:var(--rc);background:color-mix(in srgb,var(--rc) 14%,#08060f);box-shadow:inset 0 0 0 1.5px var(--rc),0 0 12px color-mix(in srgb,var(--rc) 40%,transparent);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);animation:flip .45s cubic-bezier(.2,1.4,.4,1) backwards}
 .results .icard{animation:flip .55s cubic-bezier(.2,1.4,.4,1) backwards;box-shadow:0 0 22px color-mix(in srgb,var(--rc) 45%,transparent)}
 .confetti{position:fixed;inset:0;pointer-events:none;z-index:9998}
+
+@media (max-width:560px){#pauseBtn{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 8px);width:38px;height:38px}}
