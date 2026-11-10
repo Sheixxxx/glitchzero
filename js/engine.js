@@ -224,7 +224,7 @@ const G = {
     }
     if (evId) { const E = D.EVM[evId]; setTimeout(() => this.banner(E.n, E.c, 'СОБЫТИЕ', E.d), 1400); this.stat('events'); this.stat('ev_' + evId); }
     this.activeEvent = evId;
-    this.ms = null; if (!bossId) this.initMission(this.route); this.route = null;
+    this.ms = null; if (!bossId) this.initMission(this.route); this.route = null; DynEv.reset(this); this.inAnom = false;
     this.cam.x = p.x; this.cam.y = p.y;
     this.explored = new Uint8Array(lv.W * lv.H);
     R3.on = R3.active(); document.body.classList.toggle('r3d', R3.on);
@@ -328,9 +328,10 @@ const G = {
     const M = this.ms, R = this.run; if (!M) return;
     if (M.k === 'escape' && !M.fail) M.done = true;
     if (!M.done || M.fail) return;
+    R.msDone = (R.msDone || 0) + 1;
     const base = 25 + this.diff * 4; R.coins += base; R.xp += 20 + this.diff * 5;
     const s = M.side[0], ok = s === 'nohit' ? this.secDmg === 0 : s === 'fast' ? this.secTime < 90 : s === 'combo' ? (this.secCombo || 0) >= 15 : this.chests.every(c => c.open);
-    if (ok) { P.s.gems += 8; R.coins += base; this.stat('perfectMissions'); const id = Relic.roll(this); if (id) Relic.gain(this, id); }
+    if (ok) { R.msPerf = (R.msPerf || 0) + 1; P.s.gems += 8; R.coins += base; this.stat('perfectMissions'); const id = Relic.roll(this); if (id) Relic.gain(this, id); }
     if (M.loot) R.loot.push(P.rollItem(0.5 + this.cs.luck, 2));
     this.lastMs = { n: M.n, coins: base * (ok ? 2 : 1), side: M.side[1], ok };
   },
@@ -609,7 +610,7 @@ const G = {
     p.inv = Math.max(p.inv, this.cs.fx.has('ghost') ? 1 : 0.2); this.stat('dashes'); SFX.play('dash');
   },
   crit() { return Math.random() < this.cs.crit; },
-  dmgMul() { return ((this.cs.fx.has('laststand') && this.p.hp < this.p.maxHp * 0.3) ? 1.4 : 1) * (this.buff && this.buff.rage > 0 ? 1.6 : 1) * Relic.dmgMul(this); },
+  dmgMul() { return ((this.cs.fx.has('laststand') && this.p.hp < this.p.maxHp * 0.3) ? 1.4 : 1) * (this.buff && this.buff.rage > 0 ? 1.6 : 1) * Relic.dmgMul(this) * (this.inAnom ? 2 : 1); },
   hurtEnemy(e, dmg, o) {
     if (e.dead) return;
     let c = false; if (!o.noFx) { c = this.crit(); if (c) dmg *= this.cs.critd; dmg *= this.dmgMul(); }
@@ -729,7 +730,7 @@ const G = {
       if (p.superDash && this.boss && !p.sdHit.has(this.boss) && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < this.boss.r + p.r + 14) { p.sdHit.add(this.boss); this.hurtBoss(p.superDash); }
       if (p.dashT <= 0) p.superDash = 0;
     } else { const bs = (p.boostT > 0 ? 1.7 : 1) * (this.featSlow || 1) * (p.chill > 0 ? 0.6 : 1); let vx = m.x * cs.spd * bs, vy = m.y * cs.spd * bs; if (this.onIce) { const k = Math.min(1, dt * 2.2); p.ivx = (p.ivx || 0) + (vx - (p.ivx || 0)) * k; p.ivy = (p.ivy || 0) + (vy - (p.ivy || 0)) * k; vx = p.ivx; vy = p.ivy; if ((Math.abs(vx) > 40 || Math.abs(vy) > 40) && this.frame % 3 === 0) this.trailP(p.x, p.y, '#cfefff'); } else { p.ivx = vx; p.ivy = vy; } p.x += vx * dt; p.y += vy * dt; if (p.boostT > 0 && this.frame % 2 === 0) this.trailP(p.x, p.y, '#00f0ff'); }
-    p.chill = (p.chill || 0) - dt; this.updFeats(dt); Relic.tick(this, dt); if (this.relCard) { this.relCard.t += dt; if (this.relCard.t > 3.2) this.relCard = null; }
+    p.chill = (p.chill || 0) - dt; this.updFeats(dt); Relic.tick(this, dt); DynEv.tick(this, dt); if (this.relCard) { this.relCard.t += dt; if (this.relCard.t > 3.2) this.relCard = null; }
     this.updateTiles(dt); if (this.frame % 6 === 0) this.updateRooms(dt * 6);
     if (m.x || m.y) { p.still = 0; if (!this.mouse.down) p.ang = Math.atan2(m.y, m.x); } else { p.still += dt; if (p.still > 30 && !p.afk) { p.afk = true; this.stat('afk'); } }
     this.collide(p);
@@ -1194,6 +1195,7 @@ const G = {
   drawHUD(c, T) {
     const p = this.p, R = this.run, W = this.W, H = this.H, cs = this.cs, safe = 10;
     c.textBaseline = 'middle';
+    DynEv.hud(this, c, W, H, T);
     // HP
     const hw = Math.min(220, W * 0.42);
     c.fillStyle = 'rgba(5,5,15,0.75)'; this.rr(c, safe, safe, hw, 46, 10); c.fill();

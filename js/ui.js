@@ -555,6 +555,9 @@ const UI = {
     this.el.innerHTML = `<div class="results ${win ? 'win' : 'loss'}">
       <div class="rtitle">${win ? 'ПОБЕДА' : 'СБОЙ СИСТЕМЫ'}</div><div class="rsub">${md.n}${R.mode === 'campaign' ? ' • Сектор ' + R.stage : ''}${R.mode === 'campaign' && win ? ' • ' + '★'.repeat(R.stars) + '☆'.repeat(3 - R.stars) : ''}</div>
       ${res.rec ? '<div class="newrec">★ НОВЫЙ РЕКОРД ★</div>' : ''}
+      ${(() => { const sc = R.sectors * 30 + R.kills + (R.msDone || 0) * 25 + (R.msPerf || 0) * 30 + R.maxCombo * 2 - R.dmgTaken / 20 + (win ? 60 : 0), gr = sc > 420 ? 'S' : sc > 260 ? 'A' : sc > 150 ? 'B' : sc > 70 ? 'C' : 'D', gc = { S: '#ffd23d', A: '#ff3dc8', B: '#00f0ff', C: '#3dffa0', D: '#8889a0' }[gr]; return `<div class="grade" style="--gc:${gc}"><b>${gr}</b><small>РАНГ</small></div>`; })()}
+      ${(R.msDone || R.rel && R.rel.size) ? `<div class="rrow">${R.msDone ? `<div class="rchip"><b>${R.msDone}</b><small>заданий</small></div><div class="rchip gold"><b>${R.msPerf || 0}</b><small>идеально</small></div>` : ''}${R.syn && R.syn.size ? `<div class="rchip pink"><b>${R.syn.size}</b><small>синергий</small></div>` : ''}</div>` : ''}
+      ${R.rel && R.rel.size ? `<div class="relrow">${[...R.rel].map((id, i) => { const r = D.RELM[id]; return `<div class="relc" title="${r.n}: ${r.d}" style="--rc:${D.RRAR[r.r][1]};animation-delay:${0.9 + i * 0.07}s">${r.ic}</div>`; }).join('')}</div>` : ''}
       <div class="grid statg">
         <div class="stc"><b>${R.sectors}</b><small>Секторов</small></div><div class="stc"><b>${R.kills}</b><small>Убийств</small></div>
         <div class="stc"><b>${R.cores}</b><small>Ядер</small></div><div class="stc"><b>×${R.maxCombo}</b><small>Макс. комбо</small></div>
@@ -573,6 +576,13 @@ const UI = {
     </div>`;
     this.el.querySelectorAll('[data-count]').forEach(el => { const tgt = +el.dataset.count; let t0 = performance.now(); const pre = tgt > 0 ? '+' : ''; const tick = n => { const f = Math.min(1, (n - t0) / 900); el.textContent = pre + Math.round(tgt * f); if (f < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
     SFX.play(win ? 'ach' : 'lose');
+    this.el.querySelectorAll('.icard').forEach((el, i) => setTimeout(() => SFX.play('coin'), 300 + i * 150));
+    if (win) this.confetti();
+  },
+  confetti() {
+    const cv = document.createElement('canvas'); cv.className = 'confetti'; cv.width = innerWidth; cv.height = innerHeight; document.body.appendChild(cv);
+    const c = cv.getContext('2d'), cols = ['#00f0ff', '#ff3dc8', '#ffd23d', '#3dffa0', '#b44dff'], P0 = Array.from({ length: 140 }, () => ({ x: innerWidth / 2 + (Math.random() - 0.5) * 120, y: innerHeight * 0.3, vx: (Math.random() - 0.5) * 14, vy: -6 - Math.random() * 10, r: Math.random() * 6, s: 4 + Math.random() * 6, c: cols[Math.floor(Math.random() * 5)], w: Math.random() * 0.3 }));
+    let t = 0; const loop = () => { t++; c.clearRect(0, 0, cv.width, cv.height); for (const q of P0) { q.vy += 0.28; q.vx *= 0.99; q.x += q.vx; q.y += q.vy; q.r += q.w; c.save(); c.translate(q.x, q.y); c.rotate(q.r); c.fillStyle = q.c; c.globalAlpha = Math.max(0, 1 - t / 160); c.fillRect(-q.s / 2, -q.s / 4, q.s, q.s / 2); c.restore(); } if (t < 160) requestAnimationFrame(loop); else cv.remove(); }; loop();
   },
 
   /* ---------- уведомления ---------- */

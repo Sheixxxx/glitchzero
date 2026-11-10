@@ -651,7 +651,8 @@ const R3 = {
     for (const rf of G.rifts) { this.ring(rf.x / TS, rf.y / TS, 0.6, '#b44dff', 0.7, 0.05); this.gp(rf.x / TS, 0.5, rf.y / TS, '#b44dff', 2.2, 0.5); }
     if (G.merchant) { const m = G.merchant; this.box(m.x / TS, 0.7 + Math.sin(T * 3) * 0.1, m.y / TS, 0.35, 0.35, 0.35, '#ffb020', m.used ? 0.2 : 0.9); this.gp(m.x / TS, 0.7, m.y / TS, '#ffb020', 2, m.used ? 0.1 : 0.5); }
     // объекты миссии
-    this.drawMission(G, T, px, pz);
+    this.drawMission(G, T, px, pz); DynEv.r3(G, this, T);
+    if (G.dyn && G.dyn.id === 'blackout') { this.scene.fog.near = 3; this.scene.fog.far = 9; }
     // механики биома
     for (const f of lv.feats || []) {
       if (f.k === 'belt') { const cx = (f.x + f.w / 2) / TS, cz = (f.y + f.h / 2) / TS; if (!vis(cx, cz, 8)) continue; const hz = f.dx !== 0, L = (hz ? f.w : f.h) / TS, Wd = (hz ? f.h : f.w) / TS, dir = f.dx || f.dy, sp = (G.beltMul || 1);
