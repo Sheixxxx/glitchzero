@@ -18,7 +18,7 @@ const DynEv = {
     glitch: { n: 'ЗОЛОТОЙ ГЛЮК', d: 'Поймайте его, пока не сбежал!', col: '#ffd700', dur: 1 },
     frenzy: { n: 'ОВЕРКЛОК ВРАГОВ', d: 'Враги быстрее, но монеты ×2', col: '#ff9a1a', dur: 15 }
   },
-  reset(G) { G.dyn = null; G.dynT = 35 + Math.random() * 25; },
+  reset(G) { G.dyn = null; G.dynT = (G.diff < 2 ? 70 : 40) + Math.random() * 25; },
   free(G, cx, cy, rmin, rmax) { for (let i = 0; i < 30; i++) { const a = Math.random() * 6.28, d = rmin + Math.random() * (rmax - rmin), x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d; if (G.tileAt(x, y) === 0) return { x, y }; } return null; },
   start(G, id) {
     const E = this.L[id], p = G.p, ev = G.dyn = { id, t: 0, dur: E.dur, n: E.n, col: E.col };
@@ -67,7 +67,7 @@ const DynEv = {
     const ev = G.dyn; if (!ev) return;
     if (ev.id === 'blackout') { const pq = G.proj(G.p.x, G.p.y), g = c.createRadialGradient(pq.x, pq.y, 60, pq.x, pq.y, Math.min(W, H) * 0.42); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,4,0.94)'); c.fillStyle = g; c.fillRect(0, 0, W, H); if (Math.random() < 0.02) { c.fillStyle = 'rgba(255,255,255,0.05)'; c.fillRect(0, 0, W, H); } }
     if (ev.dur > 1) {
-      const w = Math.min(260, W * 0.6), x = W / 2 - w / 2, y = H - 62, f = 1 - ev.t / ev.dur;
+      const w = Math.min(260, W * 0.6), x = W / 2 - w / 2, y = G.touch || W < 560 ? Math.round(Math.max(H * 0.27, 215)) : H - 62, f = 1 - ev.t / ev.dur;
       c.fillStyle = 'rgba(5,5,15,0.8)'; G.rr(c, x, y, w, 30, 8); c.fill(); c.strokeStyle = ev.col; c.globalAlpha = 0.6 + Math.sin(T * 6) * 0.3; c.lineWidth = 1.5; G.rr(c, x, y, w, 30, 8); c.stroke(); c.globalAlpha = 1;
       c.textAlign = 'center'; c.font = 'bold 9px Unbounded,sans-serif'; c.fillStyle = ev.col; c.fillText('⚠ ' + ev.n + '  ' + Math.ceil(ev.dur - ev.t) + ' с', W / 2, y + 12);
       c.fillStyle = '#1a1a2a'; c.fillRect(x + 8, y + 21, w - 16, 3); c.fillStyle = ev.col; c.fillRect(x + 8, y + 21, (w - 16) * f, 3);

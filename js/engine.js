@@ -28,7 +28,7 @@ const G = {
     const loop = (now) => {
       requestAnimationFrame(loop);
       let dt = Math.min(0.05, (now - last) / 1000); last = now;
-      fc++; fpsT += dt; if (fpsT > 0.5) { this.fps = Math.round(fc / fpsT); fc = 0; fpsT = 0; }
+      fc++; fpsT += dt; if (fpsT > 0.5) { this.fps = Math.round(fc / fpsT); fc = 0; fpsT = 0; if (this.state === 'play' && R3.on) R3.adapt(this.fps); }
       if (this.state === 'off') return;
       if (this.state === 'play') { try { this.update(dt); } catch (e) { console.error(e); } }
       this.render(dt);
@@ -249,11 +249,11 @@ const G = {
     else { this.pick = this.pick.filter(q => q.k !== 'core'); this.need = 0; }
     if (k === 'clear') M.goal = Math.max(5, Math.ceil(this.enemies.length * 0.75));
     if (k === 'hack') { while (lv.terms.length < 3 && rooms.length) { const q = rooms[Math.floor(Math.random() * rooms.length)]; lv.terms.push({ x: (q.cx + 1.5) * TS, y: q.cy * TS, prog: 0, done: false, k: ['emp', 'loot', 'ally', 'nuke'][lv.terms.length % 4] }); } M.goal = 3; }
-    if (k === 'defend') { M.gen = Object.assign(P0(mid), { hp: 500, max: 500, on: false, r: 26 }); M.tgt = M.gen; M.goal = 40; }
+    if (k === 'defend') { M.gen = Object.assign(P0(mid), { hp: 420 + this.diff * 30, max: 420 + this.diff * 30, on: false, r: 26 }); M.tgt = M.gen; M.goal = 40; }
     if (k === 'survive') { M.bea = Object.assign(P0(mid), { on: false }); M.tgt = M.bea; M.goal = 35; }
-    if (k === 'escort') { M.bot = Object.assign(P0(st), { hp: 320, max: 320, r: 18, i: 0 }); M.bot.x += 40; M.path = this.bfsPath(M.bot.x, M.bot.y, lv.portal.x, lv.portal.y); M.goal = M.path.length || 1; M.tgt = M.bot; }
+    if (k === 'escort') { M.bot = Object.assign(P0(st), { hp: 280 + this.diff * 25, max: 280 + this.diff * 25, r: 18, i: 0 }); M.bot.x += 40; M.path = this.bfsPath(M.bot.x, M.bot.y, lv.portal.x, lv.portal.y); M.goal = M.path.length || 1; M.tgt = M.bot; }
     if (k === 'artifact') { const q = far.find(z => z !== lv.portalRoom) || far[0]; M.art = Object.assign(P0(q), { got: false }); M.goal = 1; }
-    if (k === 'escape') { M.goal = 60; this.portalOpen = true; }
+    if (k === 'escape') { const pl = this.bfsPath(this.p.x, this.p.y, lv.portal.x, lv.portal.y).length; M.goal = Math.max(40, Math.min(90, Math.round(pl * TS / (this.cs.spd || 200) * 2.2 + 15))); M.d = 'Тревога! Доберитесь до портала за ' + M.goal + ' с'; this.portalOpen = true; }
     if (k === 'elite') { const q = far.find(z => z !== lv.portalRoom) || far[0], ty = ['guard', 'tank', 'hunter', 'shielder'][Math.floor(Math.random() * 4)]; const e = Enemies.make(this, ty, q.cx * TS, q.cy * TS, this.diff, true); e.aggro = false; this.enemies.push(e); M.elite = e; M.tgt = e; M.goal = 1; }
     const sides = [['nohit', 'Без урона'], ['fast', 'Быстрее 90 с'], ['combo', 'Комбо ×15'], ['loot', 'Открыть все сундуки']];
     M.side = sides[Math.floor(Math.random() * sides.length)];
@@ -1210,7 +1210,7 @@ const G = {
     const tm = this.rules.timeLimit ? Math.max(0, this.rules.timeLimit - R.time) : R.time;
     c.fillText(Math.floor(tm / 60) + ':' + String(Math.floor(tm % 60)).padStart(2, '0'), safe + hw - 8, safe + 34);
     // модификаторы
-    let my = safe + 58;
+    let my = safe + 58 + (this.boss && W < 560 ? 40 : 0);
     const M = this.ms; if (M && !this.boss) {
       const done = M.done, fail = M.fail, col = fail ? '#ff3d55' : done ? '#3dffa0' : '#00f0ff', f = Math.min(1, (M.prog || 0) / (M.goal || 1));
       c.fillStyle = 'rgba(5,5,15,0.78)'; this.rr(c, safe, my, hw, 52, 10); c.fill(); c.strokeStyle = col; c.globalAlpha = 0.5 + Math.sin(T * 4) * 0.2; c.lineWidth = 1.5; this.rr(c, safe, my, hw, 52, 10); c.stroke(); c.globalAlpha = 1;
@@ -1227,9 +1227,9 @@ const G = {
     const tags = Object.keys(this.mods).map(k => D.MODS.find(m => m.id === k).n); if (this.activeEvent) tags.unshift('⚠ ' + D.EVM[this.activeEvent].n);
     tags.forEach(t => { c.fillStyle = 'rgba(5,5,15,0.6)'; const tw = c.measureText(t).width + 12; this.rr(c, safe, my, tw, 18, 6); c.fill(); c.fillStyle = t[0] === '⚠' ? '#ffb020' : '#b9a6ff'; c.fillText(t, safe + 6, my + 9); my += 21; });
     // комбо
-    if (R.combo >= 3) { c.textAlign = 'center'; const s = 1 + Math.min(0.5, R.combo / 60); c.font = 'bold ' + Math.round(22 * s) + 'px Unbounded,sans-serif'; c.fillStyle = 'hsl(' + (300 - Math.min(R.combo, 50) * 3) + ',100%,65%)'; c.fillText('×' + R.combo, W / 2, (this.boss ? 70 : 30)); c.font = '9px Unbounded,sans-serif'; c.fillStyle = '#fff'; c.fillText('КОМБО', W / 2, (this.boss ? 70 : 30) + 18); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(W / 2 - 30, (this.boss ? 70 : 30) + 27, 60 * Math.max(0, R.comboT / cs.combo), 2); }
+    if (R.combo >= 3) { c.textAlign = 'center'; const s = 1 + Math.min(0.5, R.combo / 60); c.font = 'bold ' + Math.round(22 * s) + 'px Unbounded,sans-serif'; c.fillStyle = 'hsl(' + (300 - Math.min(R.combo, 50) * 3) + ',100%,65%)'; const cy0 = this.boss ? (W < 560 ? 116 : 70) : (W < 560 ? 76 : 30); c.fillText('×' + R.combo, W / 2, cy0); c.font = '9px Unbounded,sans-serif'; c.fillStyle = '#fff'; c.fillText('КОМБО', W / 2, cy0 + 18); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(W / 2 - 30, cy0 + 27, 60 * Math.max(0, R.comboT / cs.combo), 2); }
     // босс
-    if (this.boss) { const b = this.boss, bw = Math.min(W - 140, 440); c.fillStyle = 'rgba(5,5,15,0.8)'; this.rr(c, W / 2 - bw / 2, 12, bw, 30, 8); c.fill(); c.fillStyle = b.col; c.fillRect(W / 2 - bw / 2 + 6, 30, (bw - 12) * Math.max(0, b.hp / b.maxHp), 7); c.strokeStyle = 'rgba(255,255,255,0.3)'; [0.33, 0.66].forEach(f => { c.beginPath(); c.moveTo(W / 2 - bw / 2 + 6 + (bw - 12) * f, 28); c.lineTo(W / 2 - bw / 2 + 6 + (bw - 12) * f, 39); c.stroke(); }); c.fillStyle = '#fff'; c.font = 'bold 10px Unbounded,sans-serif'; c.textAlign = 'center'; c.fillText(b.n + ' • ФАЗА ' + b.phase, W / 2, 20); }
+    if (this.boss) { const b = this.boss, nar = W < 560, bw = nar ? W - 20 : Math.min(W - 140, 440), by = nar ? 62 : 12; c.fillStyle = 'rgba(5,5,15,0.8)'; this.rr(c, W / 2 - bw / 2, by, bw, 30, 8); c.fill(); c.fillStyle = b.col; c.fillRect(W / 2 - bw / 2 + 6, by + 18, (bw - 12) * Math.max(0, b.hp / b.maxHp), 7); c.strokeStyle = 'rgba(255,255,255,0.3)'; [0.33, 0.66].forEach(f => { c.beginPath(); c.moveTo(W / 2 - bw / 2 + 6 + (bw - 12) * f, by + 16); c.lineTo(W / 2 - bw / 2 + 6 + (bw - 12) * f, by + 27); c.stroke(); }); c.fillStyle = '#fff'; c.font = 'bold 10px Unbounded,sans-serif'; c.textAlign = 'center'; c.fillText(b.n + ' • ФАЗА ' + b.phase, W / 2, by + 8); }
     // мини-карта
     if (!this.ev.lost && !this.rules.noMap && !this.lv.arena) {
       const ms = Math.min(110, W * 0.26), mx = W - ms - safe, myy = safe + 44, k = ms / (this.lv.W * 3);
@@ -1247,10 +1247,10 @@ const G = {
     // баннер
     if (this.bn) { const b = this.bn; b.t += 1 / 60; const f = b.t < 0.25 ? b.t / 0.25 : b.t > 2.2 ? Math.max(0, 1 - (b.t - 2.2) / 0.4) : 1; if (b.t > 2.6) this.bn = null; else { c.globalAlpha = f; c.textAlign = 'center'; const y = H * 0.3; if (b.sub) { c.font = 'bold 11px Unbounded,sans-serif'; c.fillStyle = '#aab'; c.fillText(b.sub, W / 2, y - 26); } c.font = '900 ' + Math.min(34, W / 12) + 'px Unbounded,sans-serif'; c.fillStyle = b.col; this.glow(c, b.col, 20); c.fillText(b.s, W / 2 + (1 - f) * 40, y); this.glow(c, 0, 0); if (b.d2) { c.font = '12px Manrope,sans-serif'; c.fillStyle = '#dde'; c.fillText(b.d2, W / 2, y + 28); } c.globalAlpha = 1; } }
     // реликвии и бонусы
-    { const rel = [...R.rel], ms2 = Math.min(110, W * 0.26), sz = 24, per = Math.max(1, Math.floor((ms2 + 8) / (sz + 4))); let ry = (this.ev.lost || this.rules.noMap || this.lv.arena) ? safe + 44 : safe + 44 + ms2 + 14;
+    { const rel = [...R.rel], ms2 = Math.min(110, W * 0.26), sz = 24, per = Math.max(1, Math.floor((ms2 + 8) / (sz + 4))); let ry = (this.ev.lost || this.rules.noMap || this.lv.arena) ? (this.boss && W < 560 ? 100 : safe + 44) : safe + 44 + ms2 + 14;
       rel.forEach((id, i) => { const r = D.RELM[id], col = D.RRAR[r.r][1], x = W - safe - (i % per + 1) * (sz + 4) + 4, y = ry + Math.floor(i / per) * (sz + 4); c.fillStyle = 'rgba(5,5,15,0.8)'; this.rr(c, x, y, sz, sz, 6); c.fill(); c.strokeStyle = col; c.lineWidth = 1.5; this.rr(c, x, y, sz, sz, 6); c.stroke(); c.fillStyle = col; c.font = '13px sans-serif'; c.textAlign = 'center'; c.fillText(r.ic, x + sz / 2, y + sz / 2 + 1); });
       if (R.syn.size) { c.font = 'bold 8px Unbounded,sans-serif'; c.fillStyle = '#ff3dc8'; c.textAlign = 'right'; c.fillText('СИНЕРГИИ: ' + R.syn.size, W - safe, ry + Math.ceil(rel.length / per) * (sz + 4) + 8); }
-      const pw = Object.keys(this.pows).filter(k => this.pows[k] > 0 && k !== 'heal'); let px0 = W / 2 - pw.length * 22, py0 = (this.boss ? 52 : 0) + (R.combo >= 3 ? 70 : 46);
+      const pw = Object.keys(this.pows).filter(k => this.pows[k] > 0 && k !== 'heal'); let px0 = W / 2 - pw.length * 22, py0 = (W < 560 ? (this.boss ? 112 : 72) : (this.boss ? 52 : 0)) + (R.combo >= 3 ? 70 : 46) - (W < 560 && R.combo < 3 ? 0 : 0);
       pw.forEach((k, i) => { const P0 = D.POWS[k], f = this.pows[k] / P0.d, x = px0 + i * 44 + 22, y = py0; c.fillStyle = 'rgba(5,5,15,0.8)'; c.beginPath(); c.arc(x, y, 17, 0, 6.28); c.fill(); c.strokeStyle = P0.col; c.lineWidth = 3; c.beginPath(); c.arc(x, y, 15, -Math.PI / 2, -Math.PI / 2 + f * 6.28); c.stroke(); c.fillStyle = P0.col; c.font = '14px sans-serif'; c.textAlign = 'center'; c.fillText(P0.ic, x, y + 1); if (f < 0.25 && Math.floor(T * 8) % 2) { c.globalAlpha = 0.4; c.beginPath(); c.arc(x, y, 17, 0, 6.28); c.fill(); c.globalAlpha = 1; } });
       const RC = this.relCard; if (RC) { const r = D.RELM[RC.id], col = D.RRAR[r.r][1], t = RC.t, a = t < 0.3 ? t / 0.3 : t > 2.7 ? Math.max(0, (3.2 - t) / 0.5) : 1, sc = t < 0.3 ? 0.6 + 0.4 * (t / 0.3) + Math.sin(t / 0.3 * Math.PI) * 0.12 : 1, cw = Math.min(300, W - 40), ch = 132, cx = W / 2, cy = H * 0.62;
         c.save(); c.globalAlpha = a; c.translate(cx, cy); c.scale(sc, sc); this.glow(c, col, 30); c.fillStyle = 'rgba(8,6,20,0.94)'; this.rr(c, -cw / 2, -ch / 2, cw, ch, 14); c.fill(); this.glow(c, 0, 0); c.strokeStyle = col; c.lineWidth = 2; this.rr(c, -cw / 2, -ch / 2, cw, ch, 14); c.stroke();

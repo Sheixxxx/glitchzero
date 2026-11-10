@@ -9,7 +9,7 @@ const Enemies = {
       dmg: d.dmg * (1 + 0.06 * (diff - 1)), col: d.col, ai: d.ai, t: Math.random() * 5, cd: 1 + Math.random() * 2,
       aggro: false, hitCd: 0, fz: 0, burn: 0, st: 0, vx: 0, vy: 0, flash: 0, life: type === 'glitch' ? 30 : 0
     };
-    if (elite) { e.elite = true; e.hp = e.maxHp = hp * 5; e.r *= 1.4; e.dmg *= 1.5; e.spd *= 1.1; e.aggro = true; }
+    if (elite) { e.elite = true; e.hp = e.maxHp = hp * (3 + Math.min(2, diff * 0.15)); e.r *= 1.4; e.dmg *= 1.5; e.spd *= 1.1; e.aggro = true; }
     return e;
   },
   update(G, e, dt) {

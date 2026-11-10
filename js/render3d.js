@@ -21,10 +21,18 @@ const R3 = {
     } catch (e) { console.warn('3D недоступно', e); this.ok = false; }
   },
   active() { return this.ok && P.s.settings.r3d !== false; },
+  // адаптивное качество: снижаем разрешение и эффекты, если FPS падает
+  lvl: (('ontouchstart' in window) || navigator.maxTouchPoints > 0) ? 1 : 0, lowT: 0, hiT: 0,
+  adapt(fps) {
+    if (fps < 44) { this.lowT++; this.hiT = 0; } else if (fps > 57) { this.hiT++; this.lowT = 0; } else { this.lowT = 0; this.hiT = 0; }
+    if (this.lowT >= 3 && this.lvl < 3) { this.lvl++; this.lowT = 0; this.resize(); }
+    else if (this.hiT >= 30 && this.lvl > 0 && !this.dropped) { this.lvl--; this.hiT = 0; this.dropped = true; this.resize(); }
+  },
+  budget() { return [2400, 1500, 900, 600][this.lvl]; },
   resize() {
     if (!this.ok) return;
     const low = P.s && P.s.settings.quality === 'low';
-    this.r.setPixelRatio(Math.min(2, devicePixelRatio || 1) * (low ? 0.55 : 0.9));
+    this.r.setPixelRatio(Math.min(2, devicePixelRatio || 1) * (low ? 0.55 : 0.9) * [1, 0.8, 0.62, 0.5][this.lvl || 0]);
     this.r.setSize(innerWidth, innerHeight, false);
     this.cam.aspect = innerWidth / innerHeight; this.cam.updateProjectionMatrix();
     if (this.pmat) this.pmat.uniforms.uS.value = this.r.getDrawingBufferSize(new THREE.Vector2()).y / (2 * Math.tan(this.cam.fov * Math.PI / 360));
@@ -51,7 +59,7 @@ const R3 = {
     this.pts = new THREE.Points(g, this.pmat); this.pts.frustumCulled = false; this.scene.add(this.pts); this.pn = 0;
   },
   gp(x, y, z, col, size, a = 1) {
-    if (this.pn >= this.PN) return; const i = this.pn++, c = this.C(col);
+    if (this.pn >= (this.pBud || this.PN)) return; const i = this.pn++, c = this.C(col);
     this.pPos[i * 3] = x; this.pPos[i * 3 + 1] = y; this.pPos[i * 3 + 2] = z;
     this.pCol[i * 3] = c.r; this.pCol[i * 3 + 1] = c.g; this.pCol[i * 3 + 2] = c.b; this.pSize[i] = size; this.pA[i] = a;
   },
@@ -231,7 +239,7 @@ const R3 = {
       }
       gunG.position.set(0.24, 0.6, 0);
     }
-    g.userData.torso = r.tor;
+    g.userData.torso = r.tor; this.merge(piv, new Set(g.userData.spin || []));
     const sh = new T3.Mesh(this.discGeo, new T3.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.scale.set(0.45, 0.45, 1); sh.position.y = 0.01; g.add(sh);
     g.scale.setScalar(1.55); return g;
   },
@@ -275,6 +283,7 @@ const R3 = {
       // рожки/шипы — «живой» силуэт
       for (const s of [-1, 1]) { const h = new T3.Mesh(new T3.ConeGeometry(r * 0.12, r * 0.5, 5), this.M('#ff2040', { basic: 1 })); h.position.set(0, r * 2 + (e.type === 'drone' ? r * 0.4 : 0), s * r * 0.35); h.rotation.x = s * 0.4; body.add(h); }
     }
+    this.merge(body); if (g.userData.threat) this.merge(g.userData.threat);
     g.userData.r = r; return g;
   },
   bossModel(b) {
@@ -331,6 +340,7 @@ const R3 = {
     this.ftex = new T3.CanvasTexture(fc); this.ftex.anisotropy = 4;
     const floor = new T3.Mesh(new T3.PlaneGeometry(lv.W, lv.H), new T3.MeshLambertMaterial({ map: this.ftex, emissive: 0xffffff, emissiveMap: this.ftex, emissiveIntensity: 0.42 }));
     floor.rotation.x = -Math.PI / 2; floor.position.set(lv.W / 2, 0, lv.H / 2); grp.add(floor);
+    const out = new T3.Mesh(new T3.PlaneGeometry(lv.W + 80, lv.H + 80), new T3.MeshLambertMaterial({ color: this.C(pal.wall).clone().multiplyScalar(0.35), emissive: this.C(pal.wall).clone().multiplyScalar(0.25) })); out.rotation.x = -Math.PI / 2; out.position.set(lv.W / 2, -0.02, lv.H / 2); grp.add(out);
     // стены и объекты
     const WH = 1.25, cnt = { w: 0, p: 0, c: 0, b: 0 }, at = (x, y) => (x < 0 || y < 0 || x >= lv.W || y >= lv.H) ? 1 : lv.t[y * lv.W + x];
     const open = (x, y) => { const v = at(x, y); return v === 0 || v === 3 || v === 6 || v === 4; };
@@ -523,6 +533,22 @@ const R3 = {
     if (!on && !M.done && !M.fail) this.ring(x, z, (M.gen ? 80 : 70) / TS, col, 0.4 + Math.sin(T * 4) * 0.2);
     if (M.gen && on) { const f = Math.max(0, M.gen.hp / M.gen.max); this.plane(x - 0.6 * (1 - f), z - 1.0, 0.1, 1.2 * f, 0, f < 0.35 ? '#ff3d55' : '#ffd23d', 0.9, 1.6); this.ring(x, z, 1.1, '#ffd23d', 0.25, 0.04, true); }
   },
+  // склейка статичных деталей группы в один меш на материал (меньше вызовов отрисовки)
+  merge(root, skip) {
+    const T3 = THREE; root.updateMatrixWorld(true); const inv = root.matrixWorld.clone().invert(), by = new Map(), rm = [];
+    const walk = o => { for (const ch of o.children.slice()) { if (skip && skip.has(ch)) continue; if (ch.isMesh && !ch.isInstancedMesh && ch.material && !Array.isArray(ch.material)) { let L = by.get(ch.material); if (!L) by.set(ch.material, L = []); L.push(ch); rm.push(ch); } if (ch.children.length) walk(ch); } };
+    walk(root);
+    for (const [mat, L] of by) {
+      if (L.length < 2) { rm.splice(rm.indexOf(L[0]), 1); continue; }
+      let n = 0; const parts = L.map(m => { let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone(); const mx = inv.clone().multiply(m.matrixWorld); g.applyMatrix4(mx); if (!g.attributes.normal) g.computeVertexNormals(); n += g.attributes.position.count; return g; });
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of parts) { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; g.dispose(); }
+      const mg = new T3.BufferGeometry(); mg.setAttribute('position', new T3.BufferAttribute(pos, 3)); mg.setAttribute('normal', new T3.BufferAttribute(nor, 3)); mg.computeBoundingSphere();
+      const mm = new T3.Mesh(mg, mat); mm.userData.merged = true; root.add(mm);
+    }
+    for (const m of rm) if (m.parent) m.parent.remove(m);
+    return root;
+  },
   animHero(hg, T) {
     const u = hg.userData; if (u.float) u.piv.position.y = 0.12 + Math.sin(T * 3) * 0.06;
     if (u.spin) u.spin.forEach((o, i) => { o.rotation.y += 0.03 * (i + 1); o.rotation.z += 0.02; });
@@ -540,10 +566,10 @@ const R3 = {
   /* ---------- кадр ---------- */
   frame(G, dt, T) {
     const p = G.p, lv = G.lv, px = p.x / TS, pz = p.y / TS, cs = G.cs;
-    this.pn = 0; for (const pool of [this.lasPool, this.ringPool, this.planePool, this.boxPool]) pool.u = 0;
+    this.pBud = this.budget(); this.pn = 0; for (const pool of [this.lasPool, this.ringPool, this.planePool, this.boxPool]) pool.u = 0;
     // камера
     const asp = innerWidth / innerHeight; this.zoomK = (this.zoomK || 1) + (((G.intro && G.boss) ? 0.55 : 1) - (this.zoomK || 1)) * Math.min(1, dt * 2); const D = Math.max(13 / asp, 10.5) * (G.lv.arena ? 1.3 : 1) * this.zoomK, el = 0.92;
-    const foc = G.intro && G.boss, tx = foc ? G.boss.x / TS : px, tz = foc ? G.boss.y / TS + 1 : pz, ck = foc ? 2.5 : 7; this.ct = this.ct || { x: px, z: pz }; this.ct.x += (tx - this.ct.x) * Math.min(1, dt * ck); this.ct.z += (tz - this.ct.z) * Math.min(1, dt * ck);
+    const foc = G.intro && G.boss, tx = foc ? G.boss.x / TS : px, tz = Math.min(lv.H - 6, foc ? G.boss.y / TS + 1 : pz), ck = foc ? 2.5 : 7; this.ct = this.ct || { x: px, z: pz }; this.ct.x += (tx - this.ct.x) * Math.min(1, dt * ck); this.ct.z += (tz - this.ct.z) * Math.min(1, dt * ck);
     const sh = (G.shk || 0) / TS;
     this.cam.position.set(this.ct.x + (Math.random() - 0.5) * sh, Math.sin(el) * D, this.ct.z - 1.4 + Math.cos(el) * D + (Math.random() - 0.5) * sh);
     this.cam.lookAt(this.ct.x, 0, this.ct.z - 1.4);
@@ -555,7 +581,7 @@ const R3 = {
     const hg = this.heroG, moving = (G.moveVec().x || G.moveVec().y);
     hg.position.set(px, moving ? Math.abs(Math.sin(T * 12)) * 0.06 : 0, pz);
     hg.userData.piv.rotation.y = -p.ang; hg.userData.base.rotation.z = T * 2; this.animHero(hg, T);
-    if (sk === 'glitch') hg.userData.torso.position.x = (Math.random() - 0.5) * 0.08;
+    if (sk === 'glitch') hg.userData.piv.position.x = (Math.random() < 0.08 ? (Math.random() - 0.5) * 0.12 : 0);
     hg.visible = G.state !== 'dying' && !(p.inv > 0 && p.dashT <= 0 && Math.floor(T * 20) % 2);
     this.pl.position.set(px, 3, pz + 1); this.pl.color.copy(this.C(cs.hero.col)); this.gp(px, 0.1, pz, cs.hero.col, 1.6, G.hidden ? 0.15 : 0.35);
     if (p.shield > 0) this.ring(px, pz, 0.55, '#78c8ff', 0.6, 0.05);
@@ -670,7 +696,7 @@ const R3 = {
     }
     if (G.onIce) this.ring(px, pz, 0.5, '#cfefff', 0.3, 0.03);
     if (G.p.chill > 0) this.ring(px, pz, 0.62, '#9fe8ff', 0.6, 0.6);
-    for (const b of this.bfx || []) {
+    if (this.lvl < 2) for (const b of this.bfx || []) {
       if (b[0] === 'snow') { for (let k = 0; k < 40; k++) { const sx = this.ct.x + ((k * 7.3) % 20) - 10, sy = ((k * 3.1 - T * (0.6 + (k % 3) * 0.2)) % 4 + 4) % 4, sz = this.ct.z + ((k * 11.7) % 14) - 7 + Math.sin(T + k) * 0.3; this.gp(sx, sy, sz, '#ffffff', 0.12, 0.8); } continue; }
       if (!vis(b[1], b[3], 1)) continue;
       if (b[0] === 'smoke') for (let k = 0; k < 3; k++) { const ph = (T * 0.4 + k / 3 + b[1]) % 1; this.gp(b[1] + Math.sin(ph * 5 + b[3]) * 0.3, b[2] + ph * 2.2, b[3], '#8a8070', 0.6 + ph * 1.2, 0.35 * (1 - ph)); }
