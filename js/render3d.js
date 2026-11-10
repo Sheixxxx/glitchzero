@@ -99,75 +99,141 @@ const R3 = {
     const pu = new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 10, 8), new THREE.MeshBasicMaterial({ color: 0x000000 }));
     pu.position.z = r * 0.62; g.add(w); g.add(pu); return g;
   },
+  /* ---------- детализированные бойцы ---------- */
+  S(col, metal = 0.35, rough = 0.45, em = 0.08, emc) {
+    const k = 's' + col + metal + rough + em + (emc || ''); if (this.mats[k]) return this.mats[k];
+    return this.mats[k] = new THREE.MeshStandardMaterial({ color: this.C(col), metalness: metal, roughness: rough, emissive: this.C(emc || col), emissiveIntensity: em });
+  },
+  RB(w, h, d, r) {
+    const k = 'rb' + w + h + d + r; this.geo = this.geo || {}; if (this.geo[k]) return this.geo[k];
+    r = r === undefined ? Math.min(w, h) * 0.22 : r; const b = Math.min(w, h, d) * 0.12, W = w / 2 - b, Hh = h / 2 - b, rr = Math.min(r, W * 0.9, Hh * 0.9), s = new THREE.Shape();
+    s.moveTo(-W + rr, -Hh); s.lineTo(W - rr, -Hh); s.quadraticCurveTo(W, -Hh, W, -Hh + rr); s.lineTo(W, Hh - rr); s.quadraticCurveTo(W, Hh, W - rr, Hh); s.lineTo(-W + rr, Hh); s.quadraticCurveTo(-W, Hh, -W, Hh - rr); s.lineTo(-W, -Hh + rr); s.quadraticCurveTo(-W, -Hh, -W + rr, -Hh);
+    const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.001, d - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 4 });
+    g.translate(0, 0, -(d - 2 * b) / 2); return this.geo[k] = g;
+  },
+  Cap(r, len, seg = 12) {
+    const k = 'cap' + r + len; this.geo = this.geo || {}; if (this.geo[k]) return this.geo[k];
+    const pts = []; for (let i = 0; i <= 6; i++) { const a = -Math.PI / 2 + i / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.cos(a) * r, -len / 2 + Math.sin(a) * r)); }
+    for (let i = 0; i <= 6; i++) { const a = i / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.cos(a) * r, len / 2 + Math.sin(a) * r)); }
+    return this.geo[k] = new THREE.LatheGeometry(pts, seg);
+  },
   heroModel(H, skin) {
-    const T3 = THREE, g = new T3.Group(), col = H.col, body = this.M(col, { e: 0.22, dark: 0.75 }), glow = this.M(col, { basic: 1 });
+    const T3 = THREE, g = new T3.Group(), col = H.col, hid = H.id;
+    const glow = this.M(col, { basic: 1 }), wht = this.M('#ffffff', { basic: 1 });
+    const tint = { tri: '#ff9a3d', diamond: '#9fe8ff', hex: '#3dffa0', star: '#ffd23d', ring: '#ffffff', glitch: '#ff3dc8' }[skin];
+    const SK = { tri: ['#ff7a1a', '#2a1a10', 0.3], diamond: ['#cfefff', '#5ab8ff', 0.8], hex: ['#4a6a3a', '#c8b070', 0.2], star: ['#ffc83d', '#fff4c0', 0.9], ring: ['#f4f4ff', '#ffe9a0', 0.5], glitch: ['#1a0a20', '#ff3dc8', 0.4] }[skin];
+    const armor = SK ? this.S(SK[0], SK[2], 0.3, 0.1) : this.S(this.C(col).clone().lerp(this.C('#ffffff'), 0.25).getStyle(), 0.3, 0.38, 0.12);
+    const plate = this.S(SK ? SK[1] : '#e4e2f4', 0.15, 0.5, 0.06);
+    const suit = this.S('#22223a', 0.2, 0.75, 0.03), gm = this.S('#3a3d52', 0.85, 0.28, 0.02), blk = this.S('#101018', 0.5, 0.5, 0);
     const base = new T3.Mesh(new T3.TorusGeometry(0.42, 0.035, 8, 40), glow); base.rotation.x = Math.PI / 2; base.position.y = 0.03; g.add(base); g.userData.base = base;
-    let torsoGeo;
-    switch (skin) {
-      case 'tri': torsoGeo = new T3.ConeGeometry(0.42, 0.75, 3); break;
-      case 'diamond': torsoGeo = new T3.OctahedronGeometry(0.42); break;
-      case 'hex': torsoGeo = new T3.CylinderGeometry(0.36, 0.38, 0.6, 6); break;
-      case 'star': torsoGeo = new T3.DodecahedronGeometry(0.4); break;
-      case 'ring': torsoGeo = new T3.TorusGeometry(0.3, 0.1, 10, 24); break;
-      case 'glitch': torsoGeo = new T3.BoxGeometry(0.58, 0.58, 0.58); break;
-      default: torsoGeo = new T3.CylinderGeometry(0.3, 0.37, 0.58, 18);
-    }
     const piv = new T3.Group(); g.add(piv); g.userData.piv = piv;
-    const metal = this.M('#2a2a48', { e: 0.12, dark: 0.7 }), white = this.M('#e8e6ff', { e: 0.22, dark: 0.85 }), dark = this.M('#141428', { e: 0.08, dark: 0.6 });
-    const A = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0, par = piv) => { const o = new T3.Mesh(geo, mat); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); par.add(o); return o; };
-    const Bx = (w, h, d) => new T3.BoxGeometry(w, h, d), Cy = (a, b, h, s = 12) => new T3.CylinderGeometry(a, b, h, s), Sp = (r, a = 14, b = 10) => new T3.SphereGeometry(r, a, b);
-    const legs = (sp, w, mat) => { for (const s of [-1, 1]) { A(Cy(w, w * 0.8, 0.3, 8), mat || metal, 0, 0.17, s * sp); A(Bx(0.2, 0.08, w * 2.2), dark, 0.03, 0.04, s * sp); A(Sp(w * 0.9, 8, 6), glow, 0.04, 0.3, s * sp); } };
+    const A = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0, par = piv, s) => { const o = new T3.Mesh(geo, mat); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); if (s) o.scale.set(...s); par.add(o); return o; };
+    const RB = (w, h, d, r) => this.RB(w, h, d, r), Cap = (r, l) => this.Cap(r, l), Cy = (a, b, h, s = 16) => new T3.CylinderGeometry(a, b, h, s), Sp = (r, a = 18, b = 14) => new T3.SphereGeometry(r, a, b);
     const gunG = new T3.Group(); piv.add(gunG);
-    const hid = H.id; let torso;
-    if (hid === 'vector') {            // штурмовик: широкий, ирокез, дробовик
-      legs(0.2, 0.1); torso = A(torsoGeo, body, 0, 0.55, 0); torso.scale.set(1.15, 0.95, 1.25);
-      A(Bx(0.5, 0.22, 0.86), metal, 0, 0.78, 0); for (const s of [-1, 1]) { A(Sp(0.17, 10, 8), body, 0, 0.82, s * 0.44); A(Cy(0.02, 0.1, 0.22, 6), glow, 0, 0.98, s * 0.44); }
-      A(Bx(0.36, 0.3, 0.34), white, 0, 1.03, 0); A(Bx(0.06, 0.08, 0.3), glow, 0.18, 1.06, 0);
-      for (let i = 0; i < 5; i++) A(Cy(0, 0.05, 0.22, 4), glow, -0.12 + i * 0.07, 1.27 - Math.abs(i - 2) * 0.03, 0, 0, 0, 0.3);
-      A(Bx(0.24, 0.3, 0.42), dark, -0.3, 0.68, 0);
-      A(Bx(0.62, 0.17, 0.2), metal, 0.35, 0, 0, 0, 0, 0, gunG); for (const s of [-1, 1]) A(Cy(0.045, 0.045, 0.3, 8), dark, 0.75, 0, s * 0.05, 0, 0, Math.PI / 2, gunG); A(Bx(0.1, 0.2, 0.22), glow, 0.6, 0, 0, 0, 0, 0, gunG);
-      gunG.position.set(0.12, 0.62, 0.3);
-    } else if (hid === 'quartz') {     // танк: кристаллический колосс
-      legs(0.25, 0.14, body); torso = A(new T3.OctahedronGeometry(0.5, 0), body, 0, 0.72, 0); torso.scale.set(1, 1.1, 1.15);
-      for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28; A(Cy(0, 0.08 + (i % 3) * 0.03, 0.5 + (i % 2) * 0.25, 5), this.M(col, { basic: 1, op: 0.75, add: 1 }), -0.25 + Math.cos(a) * 0.12, 1.05 + (i % 2) * 0.1, Math.sin(a) * 0.3, Math.sin(a) * 0.5, 0, 0.4); }
-      A(Bx(0.26, 0.2, 0.3), white, 0.05, 1.22, 0); A(Bx(0.06, 0.06, 0.24), glow, 0.18, 1.24, 0);
-      A(Bx(0.12, 0.7, 0.62), this.M(col, { e: 0.35, dark: 0.6 }), 0.42, 0, 0, 0, 0, 0, gunG); A(Bx(0.13, 0.5, 0.06), glow, 0.43, 0, 0, 0, 0, 0, gunG); A(Bx(0.13, 0.06, 0.45), glow, 0.43, 0, 0, 0, 0, 0, gunG);
-      A(Sp(0.2, 10, 8), metal, 0.15, 0, 0, 0, 0, 0, gunG); gunG.position.set(0.05, 0.7, 0.3);
-    } else if (hid === 'nova') {       // снайпер: высокая, капюшон, длинная винтовка
-      legs(0.12, 0.07); torso = A(Cy(0.17, 0.26, 0.6, 12), body, 0, 0.6, 0);
-      A(new T3.ConeGeometry(0.38, 0.75, 14, 1, true), this.M(col, { e: 0.2, dark: 0.5, }), -0.04, 0.62, 0);
-      A(Sp(0.22, 16, 12), white, 0, 1.08, 0); A(new T3.ConeGeometry(0.28, 0.45, 14), this.M(col, { e: 0.25, dark: 0.6 }), -0.05, 1.2, 0, 0, 0, 0.35);
-      A(Cy(0.09, 0.09, 0.06, 16), glow, 0.2, 1.08, 0, 0, 0, Math.PI / 2); A(new T3.TorusGeometry(0.11, 0.02, 6, 16), metal, 0.22, 1.08, 0, 0, Math.PI / 2);
-      A(Bx(1.1, 0.07, 0.07), dark, 0.5, 0, 0, 0, 0, 0, gunG); A(Bx(0.3, 0.13, 0.1), metal, 0.05, -0.03, 0, 0, 0, 0, gunG); A(Cy(0.045, 0.045, 0.32, 10), metal, 0.25, 0.1, 0, 0, 0, Math.PI / 2, gunG); A(Sp(0.04, 8, 6), glow, 0.42, 0.1, 0, 0, 0, 0, gunG); A(Bx(0.12, 0.05, 0.05), glow, 1.08, 0, 0, 0, 0, 0, gunG);
-      gunG.position.set(0.05, 0.75, 0.22);
-    } else if (hid === 'phantom') {    // ассасин: парящий, плащ, два клинка, рога
-      torso = A(new T3.ConeGeometry(0.34, 0.9, 7, 1, true), this.M(col, { e: 0.3, dark: 0.35, op: 0.92 }), 0, 0.6, 0, Math.PI, 0, 0);
-      A(Cy(0.16, 0.2, 0.32, 10), dark, 0, 0.88, 0); A(Sp(0.21, 14, 10), dark, 0, 1.12, 0);
-      A(Bx(0.05, 0.05, 0.26), glow, 0.19, 1.14, 0); for (const s of [-1, 1]) A(Cy(0, 0.05, 0.32, 6), glow, -0.05, 1.33, s * 0.12, s * -0.5, 0, 0.3);
-      for (let i = 0; i < 4; i++) A(new T3.TetrahedronGeometry(0.06), glow, -0.15 - i * 0.1, 0.2 + (i % 2) * 0.1, (i % 2 ? 1 : -1) * 0.1);
-      for (const s of [-1, 1]) { A(Bx(0.62, 0.03, 0.08), this.M('#ffffff', { basic: 1 }), 0.32, 0, s * 0.16, 0, s * 0.25, 0, gunG); A(Bx(0.62, 0.05, 0.12), this.M(col, { basic: 1, op: 0.5, add: 1 }), 0.32, 0, s * 0.16, 0, s * 0.25, 0, gunG); A(Bx(0.1, 0.06, 0.06), metal, 0, 0, s * 0.16, 0, 0, 0, gunG); }
-      gunG.position.set(0.12, 0.72, 0); g.userData.float = 1;
-    } else if (hid === 'singular') {   // контроль: голова-сфера с кольцами, посох с дырой
-      torso = A(Cy(0.22, 0.12, 0.55, 10), body, 0, 0.62, 0); A(new T3.TorusGeometry(0.24, 0.03, 6, 24), glow, 0, 0.36, 0, Math.PI / 2);
-      for (const s of [-1, 1]) A(Sp(0.1, 10, 8), metal, 0, 0.85, s * 0.25);
-      A(Sp(0.24, 18, 14), this.M('#0a0a14', { e: 0.05, dark: 0.3 }), 0, 1.15, 0);
-      const r1 = A(new T3.TorusGeometry(0.34, 0.02, 6, 32), glow, 0, 1.15, 0, 1.2, 0, 0); const r2 = A(new T3.TorusGeometry(0.4, 0.015, 6, 32), glow, 0, 1.15, 0, -0.9, 0.6, 0); g.userData.spin = [r1, r2];
-      A(Sp(0.07, 8, 6), glow, 0.18, 1.18, 0);
-      A(Cy(0.025, 0.025, 1.1, 6), metal, 0, 0.1, 0, 0, 0, 0, gunG); const orb = A(Sp(0.12, 14, 10), this.M('#000000', { basic: 1 }), 0, 0.72, 0, 0, 0, 0, gunG); A(new T3.TorusGeometry(0.18, 0.03, 6, 24), glow, 0, 0.72, 0, Math.PI / 2, 0, 0, gunG); g.userData.spin.push(orb);
-      gunG.position.set(0.1, 0.45, 0.32); g.userData.float = 1;
-    } else {                            // искра: лёгкий стрелок с ранцем и двумя бластерами
-      legs(0.15, 0.08); torso = A(torsoGeo, body, 0, 0.52, 0);
-      A(Bx(0.22, 0.38, 0.36), metal, -0.27, 0.62, 0); for (const s of [-1, 1]) { A(Cy(0.06, 0.08, 0.2, 8), dark, -0.36, 0.44, s * 0.1); A(Sp(0.06, 8, 6), glow, -0.36, 0.32, s * 0.1); }
-      for (const s of [-1, 1]) A(Sp(0.12, 10, 8), white, 0, 0.78, s * 0.34);
-      A(Sp(0.24, 18, 14), white, 0, 1.0, 0); A(Bx(0.1, 0.12, 0.34), glow, 0.2, 1.0, 0);
-      A(Cy(0.02, 0.02, 0.25, 6), body, -0.08, 1.3, 0); A(Sp(0.05, 8, 6), glow, -0.08, 1.44, 0);
-      A(new T3.TorusGeometry(0.2, 0.05, 6, 16), this.M(col, { e: 0.4, dark: 0.7 }), 0, 0.78, 0, Math.PI / 2);
-      for (const s of [-1, 1]) { A(Bx(0.42, 0.11, 0.1), metal, 0.25, 0, s * 0.17, 0, 0, 0, gunG); A(Bx(0.1, 0.07, 0.07), glow, 0.48, 0, s * 0.17, 0, 0, 0, gunG); A(Bx(0.08, 0.15, 0.08), dark, 0.08, -0.08, s * 0.17, 0, 0, 0, gunG); }
-      gunG.position.set(0.12, 0.6, 0);
+    // ---------- тело-гуманоид ----------
+    const body = (o) => {
+      const sh = o.sh, bk = o.bulk, hip = 0.09 * bk;
+      if (!o.noLegs) for (const s of [-1, 1]) {
+        A(RB(0.26 * bk, 0.1, 0.13 * bk), blk, 0.04, 0.05, s * hip); A(RB(0.08, 0.03, 0.12 * bk), glow, 0.16 * bk, 0.04, s * hip);
+        A(Cap(0.055 * bk, 0.14), suit, 0, 0.21, s * hip); A(RB(0.08, 0.16, 0.1 * bk), armor, 0.04, 0.22, s * hip);
+        A(Sp(0.06 * bk, 12, 10), plate, 0.05, 0.31, s * hip, 0, 0, 0, piv, [1, 0.8, 1]);
+        A(Cap(0.065 * bk, 0.13), suit, 0, 0.41, s * hip); A(RB(0.1, 0.14, 0.11 * bk), armor, 0.03, 0.42, s * (hip + 0.01));
+      }
+      const ty = o.noLegs ? 0.62 : 0.72;
+      A(RB(0.22 * bk, 0.12, hip * 2 + 0.16), suit, 0, ty - 0.2, 0); A(RB(0.24 * bk, 0.03, hip * 2 + 0.18), gm, 0, ty - 0.15, 0); A(RB(0.05, 0.035, 0.06), glow, 0.12 * bk, ty - 0.15, 0);
+      const tor = A(RB(0.28 * bk, 0.34, sh * 1.7), suit, 0, ty, 0);
+      A(RB(0.12, 0.3, sh * 1.45), armor, 0.1 * bk, ty + 0.02, 0); A(RB(0.06, 0.14, sh * 0.9), plate, 0.165 * bk, ty + 0.05, 0);
+      A(RB(0.02, 0.02, sh * 1.2), glow, 0.18 * bk, ty - 0.07, 0); for (const s of [-1, 1]) A(RB(0.02, 0.18, 0.02), glow, 0.17 * bk, ty + 0.04, s * sh * 0.55);
+      // эмблема скина
+      const emG = { tri: new T3.ConeGeometry(0.06, 0.1, 3), diamond: new T3.OctahedronGeometry(0.06), hex: Cy(0.06, 0.06, 0.03, 6), star: new T3.DodecahedronGeometry(0.055), glitch: new T3.BoxGeometry(0.08, 0.08, 0.08) }[skin] || Sp(0.045, 12, 10);
+      const em = A(emG, glow, 0.2 * bk, ty + 0.06, 0); if (skin === 'hex') em.rotation.z = Math.PI / 2;
+      // плечи и руки
+      for (const s of [-1, 1]) {
+        A(Sp(0.11 * bk, 16, 12), armor, 0, ty + 0.15, s * sh, 0, 0, 0, piv, [1.1, 0.75, 1]); A(new T3.TorusGeometry(0.1 * bk, 0.012, 6, 24), glow, 0, ty + 0.12, s * sh, Math.PI / 2);
+        A(RB(0.12, 0.05, 0.1), plate, 0, ty + 0.22, s * sh);
+        A(Cap(0.045 * bk, 0.12), suit, 0.04, ty + 0.03, s * (sh + 0.02), 0, 0, -0.5);
+        A(Cap(0.05 * bk, 0.12), armor, 0.15, ty - 0.08, s * (sh * 0.75), 0, 0, -1.35); A(RB(0.06, 0.06, 0.07), blk, 0.24, ty - 0.1, s * sh * 0.6);
+      }
+      // голова
+      A(Cy(0.06, 0.07, 0.08, 12), gm, 0, ty + 0.22, 0);
+      const hy = ty + 0.36; A(Sp(0.165, 24, 18), armor, 0, hy, 0, 0, 0, 0, piv, [1.08, 1, 0.95]);
+      A(new T3.SphereGeometry(0.17, 24, 12, -0.9, 1.8, 1.05, 0.7), this.S('#05060c', 0.9, 0.12, 0.0), 0.005, hy, 0, 0, Math.PI / 2, 0, piv, [1.08, 1, 0.97]);
+      A(new T3.SphereGeometry(0.172, 24, 4, -0.8, 1.6, 1.45, 0.08), glow, 0.005, hy, 0, 0, Math.PI / 2, 0, piv, [1.08, 1, 0.97]);
+      for (const s of [-1, 1]) { A(Cy(0.045, 0.045, 0.04, 14), gm, 0, hy, s * 0.155, Math.PI / 2); A(Cy(0.02, 0.02, 0.045, 10), glow, 0, hy, s * 0.16, Math.PI / 2); }
+      if (skin === 'ring') { const h = A(new T3.TorusGeometry(0.16, 0.015, 8, 40), wht, -0.02, hy + 0.27, 0, Math.PI / 2); g.userData.spin = (g.userData.spin || []).concat([h]); }
+      return { tor, ty, hy };
+    };
+    let r;
+    if (hid === 'vector') {
+      r = body({ sh: 0.2, bulk: 1.22 });
+      for (let i = 0; i < 6; i++) A(new T3.ConeGeometry(0.025, 0.12 + (i % 2) * 0.04, 6), glow, -0.1 + i * 0.035, r.hy + 0.17 - Math.abs(i - 2.5) * 0.012, 0, 0, 0, 0.5);
+      A(RB(0.18, 0.3, 0.3), gm, -0.24, r.ty + 0.03, 0); for (const s of [-1, 1]) A(Cy(0.045, 0.045, 0.26, 14), this.S('#ff3dc8', 0.4, 0.3, 0.6), -0.3, r.ty + 0.03, s * 0.09);
+      A(RB(0.36, 0.13, 0.11), gm, 0.2, 0, 0, 0, 0, 0, gunG); A(RB(0.2, 0.09, 0.09), blk, -0.08, -0.03, 0, 0, 0, 0.15, gunG);
+      for (const s of [-1, 1]) { A(Cy(0.032, 0.032, 0.42, 16), gm, 0.55, 0.025, s * 0.032, 0, 0, Math.PI / 2, gunG); A(Cy(0.04, 0.04, 0.05, 16), blk, 0.76, 0.025, s * 0.032, 0, 0, Math.PI / 2, gunG); A(Cy(0.02, 0.02, 0.052, 12), glow, 0.77, 0.025, s * 0.032, 0, 0, Math.PI / 2, gunG); }
+      A(RB(0.2, 0.06, 0.1), blk, 0.48, -0.06, 0, 0, 0, 0, gunG); for (let i = 0; i < 3; i++) A(Cy(0.014, 0.014, 0.06, 8), this.S('#ffd23d', 0.6, 0.3, 0.5), 0.12 + i * 0.05, 0.02, 0.065, 0, 0, Math.PI / 2, gunG);
+      A(RB(0.06, 0.12, 0.06), blk, 0.12, -0.11, 0, 0, 0, -0.3, gunG); A(RB(0.16, 0.015, 0.02), glow, 0.24, 0.07, 0, 0, 0, 0, gunG);
+      gunG.position.set(0.22, 0.6, 0.12);
+    } else if (hid === 'quartz') {
+      r = body({ sh: 0.24, bulk: 1.45 });
+      const cm = this.S(col, 0.1, 0.1, 0.55); cm.transparent = true; cm.opacity = 0.85;
+      for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI - Math.PI / 2; A(new T3.OctahedronGeometry(0.07 + (i % 3) * 0.025, 0), cm, -0.26 - Math.abs(Math.sin(a)) * 0.04, r.ty + 0.15 + Math.cos(a) * 0.15, Math.sin(a) * 0.25, 0.3 * i, 0, 0.5, piv, [0.6, 2.2, 0.6]); }
+      for (const s of [-1, 1]) A(new T3.OctahedronGeometry(0.07, 0), cm, 0, r.ty + 0.28, s * 0.3, 0, 0, s * 0.6, piv, [0.6, 1.8, 0.6]);
+      A(Cy(0.34, 0.34, 0.06, 6), gm, 0.38, 0, 0, 0, 0, Math.PI / 2, gunG); A(Cy(0.3, 0.3, 0.07, 6), armor, 0.39, 0, 0, 0, 0, Math.PI / 2, gunG);
+      A(new T3.TorusGeometry(0.31, 0.015, 6, 6), glow, 0.425, 0, 0, 0, Math.PI / 2, Math.PI / 6, gunG); A(new T3.OctahedronGeometry(0.1, 0), cm, 0.44, 0, 0, 0, 0, 0, gunG, [0.6, 1.4, 1]);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; A(Sp(0.025, 8, 6), glow, 0.43, Math.cos(a) * 0.22, Math.sin(a) * 0.22, 0, 0, 0, gunG); }
+      gunG.position.set(0.12, 0.72, 0.28);
+    } else if (hid === 'nova') {
+      r = body({ sh: 0.15, bulk: 0.9 });
+      const cl = this.S(col, 0.05, 0.85, 0.12); cl.side = T3.DoubleSide;
+      A(new T3.ConeGeometry(0.3, 0.7, 20, 1, true, Math.PI * 0.6, Math.PI * 1.8), cl, -0.06, r.ty - 0.05, 0, 0, 0, 0.12);
+      A(new T3.SphereGeometry(0.21, 20, 14, 0, Math.PI * 2, 0, 2.1), cl, -0.03, r.hy + 0.02, 0, 0, 0, 0.25);
+      A(Cy(0.055, 0.055, 0.06, 18), gm, 0.17, r.hy + 0.02, 0.05, 0, 0, Math.PI / 2); A(Cy(0.045, 0.045, 0.065, 18), glow, 0.175, r.hy + 0.02, 0.05, 0, 0, Math.PI / 2);
+      A(RB(0.34, 0.09, 0.07), gm, 0.1, 0, 0, 0, 0, 0, gunG); A(RB(0.22, 0.1, 0.06), blk, -0.16, -0.02, 0, 0, 0, 0.1, gunG);
+      A(Cy(0.02, 0.024, 0.85, 14), blk, 0.68, 0.01, 0, 0, 0, Math.PI / 2, gunG); A(RB(0.08, 0.04, 0.05), gm, 1.12, 0.01, 0, 0, 0, 0, gunG); A(RB(0.02, 0.03, 0.055), glow, 1.17, 0.01, 0, 0, 0, 0, gunG);
+      A(Cy(0.035, 0.035, 0.3, 16), gm, 0.12, 0.1, 0, 0, 0, Math.PI / 2, gunG); A(Cy(0.042, 0.035, 0.05, 16), blk, 0.28, 0.1, 0, 0, 0, Math.PI / 2, gunG); A(Cy(0.03, 0.03, 0.01, 16), glow, 0.305, 0.1, 0, 0, 0, Math.PI / 2, gunG);
+      for (const s of [-1, 1]) A(Cy(0.006, 0.006, 0.2, 6), gm, 0.5, -0.09, s * 0.04, s * 0.35, 0, 0, gunG);
+      A(RB(0.06, 0.11, 0.045), blk, 0.08, -0.09, 0, 0, 0, 0.15, gunG); A(RB(0.3, 0.012, 0.074), glow, 0.12, 0.048, 0, 0, 0, 0, gunG);
+      gunG.position.set(0.18, 0.66, 0.1);
+    } else if (hid === 'phantom') {
+      r = body({ sh: 0.15, bulk: 0.9, noLegs: true });
+      const cl = this.S('#1a0f2a', 0.05, 0.8, 0.1, col); cl.side = T3.DoubleSide;
+      const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new T3.Vector2(0.13 + t * t * 0.2 + Math.sin(t * 9) * 0.01, 0.5 - t * 0.5)); }
+      A(new T3.LatheGeometry(pts, 24), cl, 0, 0.05, 0);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28; A(new T3.ConeGeometry(0.04, 0.14, 4), glow, Math.cos(a) * 0.3, 0.04, Math.sin(a) * 0.3, Math.PI, 0, 0); }
+      A(new T3.SphereGeometry(0.2, 20, 14, 0, Math.PI * 2, 0, 2.0), cl, -0.02, r.hy + 0.01, 0, 0, 0, 0.2);
+      for (const s of [-1, 1]) A(new T3.ConeGeometry(0.03, 0.22, 8), glow, -0.04, r.hy + 0.2, s * 0.1, s * -0.45, 0, 0.35);
+      for (const s of [-1, 1]) {
+        const bl = new T3.Shape(); bl.moveTo(0, -0.025); bl.lineTo(0.5, -0.01); bl.lineTo(0.62, 0.03); bl.lineTo(0.45, 0.03); bl.lineTo(0, 0.025);
+        A(new T3.ExtrudeGeometry(bl, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 }), this.S('#e8f0ff', 0.95, 0.15, 0.25, col), 0.08, 0, s * 0.14, 0, s * 0.2, 0, gunG);
+        A(RB(0.1, 0.035, 0.05), gm, 0.03, 0, s * 0.14, 0, s * 0.2, 0, gunG); A(Cy(0.03, 0.03, 0.02, 10), glow, 0.09, 0, s * 0.14, Math.PI / 2, 0, 0, gunG);
+      }
+      gunG.position.set(0.2, 0.52, 0); g.userData.float = 1;
+    } else if (hid === 'singular') {
+      r = body({ sh: 0.15, bulk: 0.95, noLegs: true });
+      const rb = this.S('#160a1a', 0.1, 0.7, 0.1, col); rb.side = T3.DoubleSide;
+      const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new T3.Vector2(0.14 + t * 0.16, 0.48 - t * 0.48)); }
+      A(new T3.LatheGeometry(pts, 24), rb, 0, 0.06, 0); for (let i = 0; i < 3; i++) A(new T3.TorusGeometry(0.17 + i * 0.05, 0.008, 6, 32), glow, 0, 0.42 - i * 0.15, 0, Math.PI / 2);
+      const r1 = A(new T3.TorusGeometry(0.26, 0.012, 8, 48), glow, 0, r.hy, 0, 1.2, 0, 0), r2 = A(new T3.TorusGeometry(0.31, 0.008, 8, 48), wht, 0, r.hy, 0, -0.9, 0.6, 0);
+      g.userData.spin = (g.userData.spin || []).concat([r1, r2]);
+      A(Cy(0.018, 0.022, 1.15, 10), gm, 0, 0.05, 0, 0, 0, 0, gunG); for (let i = 0; i < 4; i++) A(Cy(0.026, 0.026, 0.03, 10), glow, 0, -0.35 + i * 0.2, 0, 0, 0, 0, gunG);
+      for (let i = 0; i < 3; i++) { const a = i / 3 * 6.28; A(new T3.ConeGeometry(0.02, 0.18, 6), gm, Math.cos(a) * 0.08, 0.68, Math.sin(a) * 0.08, Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4, gunG); }
+      const orb = A(Sp(0.08, 20, 16), this.M('#000000', { basic: 1 }), 0, 0.74, 0, 0, 0, 0, gunG); A(new T3.TorusGeometry(0.12, 0.018, 8, 32), glow, 0, 0.74, 0, Math.PI / 2, 0, 0, gunG);
+      g.userData.spin.push(orb); gunG.position.set(0.24, 0.45, 0.24); g.userData.float = 1;
+    } else {
+      r = body({ sh: 0.16, bulk: 1 });
+      A(new T3.ConeGeometry(0.02, 0.2, 8), gm, -0.06, r.hy + 0.25, 0.08, 0, 0, -0.2); A(Sp(0.025, 10, 8), glow, -0.08, r.hy + 0.35, 0.08);
+      A(RB(0.14, 0.28, 0.26), gm, -0.22, r.ty + 0.02, 0); A(RB(0.02, 0.2, 0.18), glow, -0.15, r.ty + 0.02, 0);
+      for (const s of [-1, 1]) { A(Cy(0.04, 0.055, 0.14, 14), blk, -0.25, r.ty - 0.18, s * 0.08); A(Cy(0.035, 0.035, 0.02, 14), glow, -0.25, r.ty - 0.26, s * 0.08); }
+      for (const s of [-1, 1]) {
+        const gz = s * 0.13; A(RB(0.24, 0.075, 0.055), gm, 0.1, 0, gz, 0, 0, 0, gunG); A(RB(0.06, 0.1, 0.045), blk, 0.0, -0.07, gz, 0, 0, -0.25, gunG);
+        A(Cy(0.022, 0.022, 0.12, 14), blk, 0.27, 0.01, gz, 0, 0, Math.PI / 2, gunG); A(new T3.TorusGeometry(0.024, 0.008, 6, 16), glow, 0.33, 0.01, gz, 0, Math.PI / 2, 0, gunG);
+        A(RB(0.1, 0.02, 0.058), glow, 0.1, 0.04, gz, 0, 0, 0, gunG); A(Cy(0.015, 0.015, 0.06, 8), this.S(col, 0.2, 0.3, 0.7), 0.06, 0.0, gz + s * 0.03, Math.PI / 2, 0, 0, gunG);
+      }
+      gunG.position.set(0.24, 0.6, 0);
     }
-    g.userData.torso = torso;
+    g.userData.torso = r.tor;
     const sh = new T3.Mesh(this.discGeo, new T3.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.scale.set(0.45, 0.45, 1); sh.position.y = 0.01; g.add(sh);
-    g.scale.setScalar(1.45); return g;
+    g.scale.setScalar(1.55); return g;
   },
   enemyModel(e) {
     const T3 = THREE, g = new T3.Group(), col = e.col, m = this.M(col), r = e.r / TS * 1.25;
@@ -482,7 +548,7 @@ const R3 = {
     if (!this.lr) {
       this.lcv = document.createElement('canvas');
       this.lr = new T3.WebGLRenderer({ canvas: this.lcv, antialias: true, alpha: true, preserveDrawingBuffer: true }); this.lr.setClearColor(0, 0);
-      this.ls = new T3.Scene(); this.lc = new T3.PerspectiveCamera(32, 1, 0.1, 50); this.lc.position.set(0, 2.1, 4.6); this.lc.lookAt(0, 0.75, 0);
+      this.ls = new T3.Scene(); this.lc = new T3.PerspectiveCamera(32, 1, 0.1, 50); this.lc.position.set(0, 2.1, 4.6); this.lc.lookAt(0, 0.95, 0);
       this.ls.add(new T3.HemisphereLight(0x9a8cff, 0x100828, 0.9)); const dl = new T3.DirectionalLight(0xffffff, 0.7); dl.position.set(2, 4, 3); this.ls.add(dl);
       this.lpl = new T3.PointLight(0xffffff, 1.5, 6, 2); this.lpl.position.set(0, 1.5, 1.2); this.ls.add(this.lpl);
       const ped = this.lped = new T3.Group(); this.ls.add(ped);
@@ -496,7 +562,7 @@ const R3 = {
     }
     const key = H.id + skin; if (!this.lhero[key]) { this.lhero[key] = this.heroModel(H, skin); this.lhero[key].userData.base.visible = false; }
     for (const k in this.lhero) { if (this.lhero[k].parent) this.ls.remove(this.lhero[k]); }
-    const hm = this.lhero[key]; this.ls.add(hm); hm.scale.setScalar(1.25); hm.position.y = 0.11 + Math.sin(T * 2) * 0.05; hm.userData.piv.rotation.y = -Math.PI / 2 + Math.sin(T * 0.7) * 0.9; this.animHero(hm, T);
+    const hm = this.lhero[key]; this.ls.add(hm); hm.scale.setScalar(1.75); hm.position.y = 0.11 + Math.sin(T * 2) * 0.05; hm.userData.piv.rotation.y = -Math.PI / 2 + Math.sin(T * 0.7) * 0.9; this.animHero(hm, T);
     const col = this.C(lock ? '#555566' : H.col);
     this.lring.material.color.copy(col); this.lring2.material.color.copy(col); this.lbeam.material.color.copy(col); this.lpl.color.copy(col); this.lring.rotation.z = T;
     this.lparts.forEach((m, i) => { const ph = (T * 0.35 + i / 18) % 1, a = i * 2.4 + T * 0.3; m.position.set(Math.cos(a) * 0.85 * (1 - ph * 0.3), ph * 2.6, Math.sin(a) * 0.85 * (1 - ph * 0.3)); m.material.color.copy(col); m.scale.setScalar(1 - ph); });
