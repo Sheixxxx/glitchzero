@@ -248,6 +248,22 @@ const R3 = {
       case 'bomber': add(new T3.SphereGeometry(r, 16, 12)); add(new T3.CylinderGeometry(0.03, 0.03, r * 0.6, 6), this.M('#ffd23d', { basic: 1 }), r * 2.1); g.userData.fuse = add(new T3.SphereGeometry(0.07, 8, 6), this.M('#ffd23d', { basic: 1 }), r * 2.4); break;
       case 'splitter': add(new T3.BoxGeometry(r * 1.3, r * 1.3, r * 1.3)); add(new T3.BoxGeometry(r * 1.3, r * 1.3, r * 1.3), this.M(col, { basic: 1, op: 0.35, add: 1 })).rotation.y = 0.78; break;
       case 'glitch': add(new T3.DodecahedronGeometry(r * 1.1), this.M('#ffd700', { e: 1 })); break;
+      case 'hunter': { const sm = this.S(col, 0.5, 0.35, 0.25); add(this.Cap(r * 0.45, r * 1.2), sm, r * 0.9).rotation.z = Math.PI / 2; add(new T3.ConeGeometry(r * 0.4, r * 0.9, 6), sm, r * 0.9, r * 1.1).rotation.z = -Math.PI / 2;
+        for (const s of [-1, 1]) for (let i = 0; i < 2; i++) { const l = add(new T3.CylinderGeometry(0.02, 0.015, r * 1.3, 5), this.S('#222', 0.7, 0.4, 0), r * 0.45, (i ? 0.3 : -0.3) * r, s * r * 0.55); l.rotation.x = s * 0.7; }
+        for (let i = 0; i < 4; i++) add(new T3.ConeGeometry(r * 0.1, r * 0.4, 4), this.M('#ffffff', { basic: 1 }), r * 1.35, -r * 0.4 + i * r * 0.25).rotation.z = 0.4; break; }
+      case 'sniper': { const sm = this.S(col, 0.6, 0.3, 0.2); add(new T3.CylinderGeometry(r * 0.2, r * 0.7, r * 1.6, 8), sm, r * 0.8); add(new T3.SphereGeometry(r * 0.5, 14, 10), this.S('#2a2a3a', 0.8, 0.25, 0.05), r * 1.8);
+        add(new T3.CylinderGeometry(0.03, 0.03, r * 2.6, 8), this.S('#1a1a22', 0.8, 0.3, 0), r * 1.7, r * 1.2).rotation.z = Math.PI / 2; add(new T3.SphereGeometry(0.05, 8, 6), this.M('#ff2020', { basic: 1 }), r * 1.7, r * 2.5);
+        for (let i = 0; i < 3; i++) { const a = i / 3 * 6.28, l = add(new T3.CylinderGeometry(0.02, 0.02, r * 1.4, 5), this.S('#333', 0.7, 0.4, 0), r * 0.4, Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6); l.rotation.set(Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6); } break; }
+      case 'tank': { const sm = this.S(col, 0.7, 0.35, 0.15), dk = this.S('#2a2238', 0.8, 0.4, 0.02); add(this.RB(r * 2, r * 0.9, r * 1.7), sm, r * 0.75); add(this.RB(r * 1.2, r * 0.6, r * 1.2), dk, r * 1.45);
+        for (const s of [-1, 1]) { add(this.RB(r * 2.2, r * 0.6, r * 0.45), dk, r * 0.3, 0, s * r * 0.95); for (let i = 0; i < 4; i++) add(new T3.CylinderGeometry(r * 0.2, r * 0.2, r * 0.5, 12), this.S('#111', 0.5, 0.6, 0), r * 0.3, -r * 0.75 + i * r * 0.5, s * r * 0.95).rotation.x = Math.PI / 2; }
+        add(new T3.CylinderGeometry(r * 0.15, r * 0.18, r * 1.6, 12), dk, r * 1.5, r * 0.9).rotation.z = Math.PI / 2; add(new T3.TorusGeometry(r * 0.17, 0.03, 6, 16), this.M(col, { basic: 1 }), r * 1.5, r * 1.7).rotation.y = Math.PI / 2; break; }
+      case 'healer': { const sm = this.S('#e8fff4', 0.2, 0.4, 0.15); add(new T3.SphereGeometry(r * 0.8, 18, 14), sm, r * 1.1); add(new T3.TorusGeometry(r * 0.95, 0.04, 8, 32), this.M(col, { basic: 1 }), r * 1.1).rotation.x = Math.PI / 2;
+        add(new T3.BoxGeometry(r * 0.9, r * 0.28, 0.05), this.M(col, { basic: 1 }), r * 1.2, r * 0.75).rotation.y = Math.PI / 2; add(new T3.BoxGeometry(r * 0.28, r * 0.9, 0.05), this.M(col, { basic: 1 }), r * 1.2, r * 0.75).rotation.y = Math.PI / 2;
+        for (let i = 0; i < 3; i++) { const a = i / 3 * 6.28; add(new T3.CylinderGeometry(0.015, 0.015, r * 0.9, 5), this.S('#555', 0.8, 0.3, 0), r * 0.35, Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5); } break; }
+      case 'shielder': { const sm = this.S(col, 0.6, 0.3, 0.2); add(this.Cap(r * 0.55, r * 0.8), sm, r * 1.0); add(new T3.SphereGeometry(r * 0.4, 14, 10), this.S('#c8dcff', 0.4, 0.3, 0.2), r * 1.9);
+        const sh = add(new T3.SphereGeometry(r * 1.3, 20, 12, -1.1, 2.2, 0.5, 1.6), new T3.MeshBasicMaterial({ color: this.C(col), transparent: true, opacity: 0.28, side: T3.DoubleSide, blending: T3.AdditiveBlending, depthWrite: false }), r * 1.1, r * 0.3); sh.rotation.y = Math.PI / 2; g.userData.dome = sh; break; }
+      case 'miner': { const sm = this.S(col, 0.5, 0.4, 0.2); add(this.RB(r * 1.4, r * 0.9, r * 1.2), sm, r * 0.7); add(new T3.CylinderGeometry(r * 0.3, r * 0.3, r * 0.5, 12), this.S('#333', 0.7, 0.3, 0), r * 1.35);
+        for (let i = 0; i < 3; i++) add(new T3.SphereGeometry(r * 0.22, 10, 8), this.M('#ff3d20', { basic: 1 }), r * 1.15, -r * 0.4 + i * r * 0.4, -r * 0.65); for (const s of [-1, 1]) add(new T3.CylinderGeometry(r * 0.28, r * 0.28, r * 0.2, 12), this.S('#111', 0.4, 0.6, 0), r * 0.28, 0, s * r * 0.65).rotation.x = Math.PI / 2; break; }
     }
     if (e.type !== 'glitch') { const ey = this.eye(r * 0.36); ey.position.y = e.type === 'drone' ? r * 1.6 : e.type === 'turret' ? r * 0.9 : r * 1.05; g.add(ey); g.userData.eye = ey; g.userData.eyeR = r * 0.55; }
     const sh = new T3.Mesh(this.discGeo, new T3.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.scale.set(r, r, 1); sh.position.y = 0.012; g.add(sh);
@@ -389,6 +405,46 @@ const R3 = {
     delete this.tileInst[i]; if (ti[0] === 'w') this.buildEdges();
     if (this.floorCv) { this.floorCv.getContext('2d').drawImage(G.mapCv, 0, 0, this.floorCv.width, this.floorCv.height); this.ftex.needsUpdate = true; }
   },
+  msModel(k) {
+    const T3 = THREE, g = new T3.Group(), A = (geo, mat, x, y, z) => { const o = new T3.Mesh(geo, mat); o.position.set(x, y, z); g.add(o); return o; };
+    const gm = this.S('#3a3d52', 0.85, 0.3, 0.03), dk = this.S('#15151f', 0.6, 0.5, 0);
+    if (k === 'gen') {
+      A(new T3.CylinderGeometry(0.7, 0.8, 0.2, 8), dk, 0, 0.1, 0); for (let i = 0; i < 4; i++) { const a = i / 4 * 6.28 + 0.78; A(this.RB(0.18, 1.1, 0.18), gm, Math.cos(a) * 0.5, 0.65, Math.sin(a) * 0.5); }
+      g.userData.core = A(new T3.CylinderGeometry(0.25, 0.25, 0.9, 16), this.M('#ffd23d', { e: 1, dark: 0.9 }), 0, 0.7, 0);
+      g.userData.rings = [0, 1, 2].map(i => { const t = A(new T3.TorusGeometry(0.38, 0.03, 8, 32), this.M('#ffd23d', { basic: 1 }), 0, 0.35 + i * 0.35, 0); t.rotation.x = Math.PI / 2; return t; });
+      A(this.RB(0.9, 0.12, 0.9), gm, 0, 1.25, 0);
+    } else if (k === 'bea') {
+      A(new T3.CylinderGeometry(0.5, 0.6, 0.15, 12), dk, 0, 0.08, 0); A(new T3.CylinderGeometry(0.06, 0.1, 1.6, 8), gm, 0, 0.9, 0);
+      g.userData.core = A(new T3.OctahedronGeometry(0.22), this.M('#ff3d55', { e: 1, dark: 0.9 }), 0, 1.85, 0);
+      g.userData.rings = [A(new T3.TorusGeometry(0.35, 0.025, 8, 32), this.M('#ff3d55', { basic: 1 }), 0, 1.85, 0)];
+    } else if (k === 'bot') {
+      const bd = A(this.RB(0.7, 0.45, 0.55), this.S('#e8e6f4', 0.3, 0.4, 0.08), 0, 0.5, 0); A(this.RB(0.5, 0.1, 0.45), this.S('#00f0ff', 0.3, 0.3, 0.6), 0, 0.78, 0);
+      for (const s of [-1, 1]) for (const f of [-1, 1]) { const w = A(new T3.CylinderGeometry(0.14, 0.14, 0.1, 16), dk, f * 0.25, 0.15, s * 0.3); w.rotation.x = Math.PI / 2; }
+      A(new T3.SphereGeometry(0.15, 14, 10), this.S('#2a2a3a', 0.8, 0.2, 0), 0.3, 0.9, 0); g.userData.core = A(new T3.SphereGeometry(0.07, 10, 8), this.M('#00f0ff', { basic: 1 }), 0.42, 0.92, 0);
+      A(this.RB(0.4, 0.3, 0.35), this.S('#ffb020', 0.4, 0.4, 0.2), -0.12, 0.92, 0);
+    } else {
+      A(new T3.CylinderGeometry(0.4, 0.5, 0.25, 8), dk, 0, 0.12, 0); g.userData.core = A(new T3.IcosahedronGeometry(0.25, 0), this.S('#ffd23d', 0.9, 0.15, 0.6), 0, 0.9, 0);
+      g.userData.rings = [A(new T3.TorusGeometry(0.42, 0.02, 8, 40), this.M('#ffd23d', { basic: 1 }), 0, 0.9, 0), A(new T3.TorusGeometry(0.5, 0.015, 8, 40), this.M('#ffffff', { basic: 1 }), 0, 0.9, 0)];
+    }
+    this.lvG.add(g); return g;
+  },
+  drawMission(G, T, px, pz) {
+    const M = G.ms; if (!M) { this.msG = null; return; }
+    if (!this.msG || this.msG.userData.M !== M) {
+      this.msG = { userData: { M } };
+      if (M.gen) this.msG.o = this.msModel('gen'); if (M.bea) this.msG.o = this.msModel('bea'); if (M.bot) this.msG.o = this.msModel('bot'); if (M.art) this.msG.o = this.msModel('art');
+    }
+    const o = this.msG.o; if (!o) return; const u = o.userData;
+    const obj = M.gen || M.bea || M.bot || M.art, x = obj.x / TS, z = obj.y / TS; o.position.set(x, 0, z);
+    if (M.art) { o.visible = !M.art.got; u.core.rotation.set(T, T * 1.3, 0); u.core.position.y = 0.9 + Math.sin(T * 2) * 0.12; u.rings[0].rotation.set(T * 1.1, 0, T * 0.7); u.rings[1].rotation.set(-T * 0.8, T, 0); this.gp(x, 0.9, z, '#ffd23d', 2.4, 0.7); const ph = (T * 0.5) % 1; this.ring(x, z, 0.5 + ph * 6, '#ffd23d', 0.35 * (1 - ph), 0.04); return; }
+    if (M.bot) { o.rotation.y = -(M.bot.ang || 0); this.gp(x, 0.9, z, '#00f0ff', 1, 0.6); const f = M.bot.hp / M.bot.max; this.plane(x - 0.45 * (1 - f), z - 0.75, 0.08, 0.9 * f, 0, f < 0.35 ? '#ff3d55' : '#3dffa0', 0.9, 1.3); if (M.bot.moving) this.ring(x, z, 0.6, '#00f0ff', 0.4); else this.ring(x, z, 220 / TS, '#00f0ff', 0.18 + Math.sin(T * 3) * 0.08); return; }
+    const on = (M.gen && M.gen.on) || (M.bea && M.bea.on), col = M.gen ? '#ffd23d' : '#ff3d55';
+    if (u.rings) u.rings.forEach((r, i) => { r.position.y = M.gen ? 0.35 + ((i * 0.35 + T * (on ? 0.8 : 0.1)) % 1.05) : 1.85; r.rotation.z = T * (i + 1); r.scale.setScalar(M.bea ? 1 + Math.sin(T * 6) * 0.2 : 1); });
+    u.core.rotation.y = T * (on ? 4 : 0.5);
+    this.gp(x, 1, z, col, on ? 3 : 1.5, on ? 0.7 : 0.4);
+    if (!on && !M.done && !M.fail) this.ring(x, z, (M.gen ? 80 : 70) / TS, col, 0.4 + Math.sin(T * 4) * 0.2);
+    if (M.gen && on) { const f = Math.max(0, M.gen.hp / M.gen.max); this.plane(x - 0.6 * (1 - f), z - 1.0, 0.1, 1.2 * f, 0, f < 0.35 ? '#ff3d55' : '#ffd23d', 0.9, 1.6); this.ring(x, z, 1.1, '#ffd23d', 0.25, 0.04, true); }
+  },
   animHero(hg, T) {
     const u = hg.userData; if (u.float) u.piv.position.y = 0.12 + Math.sin(T * 3) * 0.06;
     if (u.spin) u.spin.forEach((o, i) => { o.rotation.y += 0.03 * (i + 1); o.rotation.z += 0.02; });
@@ -436,6 +492,8 @@ const R3 = {
       const b = m.userData.body, pa = Math.atan2(p.y - e.y, p.x - e.x);
       if (e.type === 'bug' || e.type === 'splitter') b.rotation.y = T * 2 + e.t; else if (e.type === 'drone') b.rotation.y = T * 3; else if (e.type === 'glitch') { b.rotation.y = T * 4; b.rotation.x = T * 3; } else b.rotation.y = -pa;
       if (m.userData.eye) { const er = m.userData.eyeR; m.userData.eye.position.x = Math.cos(pa) * er; m.userData.eye.position.z = Math.sin(pa) * er; m.userData.eye.rotation.y = -pa + Math.PI / 2; }
+      if (e.elite) { this.ring(ex, ez, m.userData.r * 2.2, '#ffd23d', 0.6 + Math.sin(T * 5) * 0.25, 0.05); this.gp(ex, m.userData.r * 2.6, ez, '#ffd23d', 1.2, 0.9); for (let k = 0; k < 3; k++) { const a = T * 3 + k * 2.1; this.gp(ex + Math.cos(a) * m.userData.r * 1.8, 0.3 + k * 0.3, ez + Math.sin(a) * m.userData.r * 1.8, '#ffe27a', 0.35, 1); } }
+      if (e.shd > 0) this.ring(ex, ez, m.userData.r * 1.4, '#4da6ff', 0.55, 0.4);
       if (m.userData.threat) { m.userData.threat.rotation.y = T * 1.5; m.userData.threat.children[0].material.opacity = 0.55 + Math.sin(T * 6 + e.t) * 0.3; }
       if (e.type !== 'turret' && e.type !== 'drone') { b.position.y = Math.abs(Math.sin(T * 8 + e.t * 3)) * 0.08; b.scale.y = 1 + Math.sin(T * 16 + e.t * 3) * 0.06; }
       const fl = e.flash > 0; m.scale.setScalar(fl ? 1.15 : (e.ai === 'bomb' && e.st === 1 ? 1 + Math.abs(Math.sin(T * 20)) * 0.25 : 1));
@@ -493,6 +551,8 @@ const R3 = {
     for (const tp of lv.tps) for (const q of [tp.a, tp.b]) { this.gp(q.x / TS, 0.3, q.y / TS, '#b44dff', 1.4, 0.5); this.gp(q.x / TS, 0.3 + ((T * 1.5) % 1) * 1.2, q.y / TS, '#d58cff', 0.3, 1 - (T * 1.5) % 1); }
     for (const rf of G.rifts) { this.ring(rf.x / TS, rf.y / TS, 0.6, '#b44dff', 0.7, 0.05); this.gp(rf.x / TS, 0.5, rf.y / TS, '#b44dff', 2.2, 0.5); }
     if (G.merchant) { const m = G.merchant; this.box(m.x / TS, 0.7 + Math.sin(T * 3) * 0.1, m.y / TS, 0.35, 0.35, 0.35, '#ffb020', m.used ? 0.2 : 0.9); this.gp(m.x / TS, 0.7, m.y / TS, '#ffb020', 2, m.used ? 0.1 : 0.5); }
+    // объекты миссии
+    this.drawMission(G, T, px, pz);
     // фонари, терминалы, алтари
     for (const [x, z] of this.lamps || []) if (vis(x, z, 1)) { this.gp(x, this.WH + 0.95, z, G.pal.edge, 0.9, 0.7 + Math.sin(T * 3 + x) * 0.2); this.gp(x, this.WH + 0.95, z, '#ffffff', 0.25, 0.9); }
     (lv.terms || []).forEach((tm, i) => {

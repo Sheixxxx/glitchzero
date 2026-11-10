@@ -9,15 +9,17 @@ const Enemies = {
       dmg: d.dmg * (1 + 0.06 * (diff - 1)), col: d.col, ai: d.ai, t: Math.random() * 5, cd: 1 + Math.random() * 2,
       aggro: false, hitCd: 0, fz: 0, burn: 0, st: 0, vx: 0, vy: 0, flash: 0, life: type === 'glitch' ? 30 : 0
     };
+    if (elite) { e.elite = true; e.hp = e.maxHp = hp * 5; e.r *= 1.4; e.dmg *= 1.5; e.spd *= 1.1; e.aggro = true; }
     return e;
   },
   update(G, e, dt) {
     const p = G.p, slow = (G.slowT > 0 ? 0.35 : 1) * (G.ev.slowmo ? 0.7 : 1) * (e.fz > 0 ? 0.35 : 1);
     const rdist = Math.hypot(p.x - e.x, p.y - e.y) || 1, hid = G.hidden && rdist > 120;
     if (!hid) { e.lsx = p.x; e.lsy = p.y; }
-    const gx = hid ? (e.lsx !== undefined ? e.lsx : e.x) : p.x, gy = hid ? (e.lsy !== undefined ? e.lsy : e.y) : p.y;
+    let gx = hid ? (e.lsx !== undefined ? e.lsx : e.x) : p.x, gy = hid ? (e.lsy !== undefined ? e.lsy : e.y) : p.y;
+    if (e.tgt && e.tgt.hp > 0 && rdist > 140) { gx = e.tgt.x; gy = e.tgt.y; }
     const dx = gx - e.x, dy = gy - e.y, dist = hid ? Math.max(500, Math.hypot(dx, dy)) : rdist, md = Math.hypot(dx, dy) || 1, nx = dx / md, ny = dy / md;
-    e.t += dt; e.cd -= dt * slow; e.hitCd -= dt; e.fz -= dt; e.flash -= dt;
+    e.t += dt; e.cd -= dt * slow; e.hitCd -= dt; e.fz -= dt; e.flash -= dt; e.shd = Math.max(0, (e.shd || 0) - dt);
     if (e.burn > 0) { e.burn -= dt; e.burnT = (e.burnT || 0) - dt; if (e.burnT <= 0) { e.burnT = 0.5; G.hurtEnemy(e, e.burnDmg, { noFx: true }); if (e.dead) return; } }
     if (G.mods.regen && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02 * dt);
     if (!e.aggro) { if ((rdist < 400 && !hid) || e.hp < e.maxHp) e.aggro = true; else return; }
@@ -41,6 +43,33 @@ const Enemies = {
       case 'bomb':
         if (e.st === 0) { mx = nx; my = ny; if (rdist < 55) { e.st = 1; e.stT = 0.6; } }
         else { e.stT -= dt; if (e.stT <= 0) { G.explode(e.x, e.y, 80, e.dmg, true); e.hp = 0; G.killEnemy(e, true); return; } }
+        break;
+      case 'hunter': // кружит, затем делает выпад
+        if (e.st === 0) { const s = dist < 190 ? 1 : 0; mx = nx * (1 - s) - ny * s; my = ny * (1 - s) + nx * s; sp *= 1.1; if (dist < 230 && e.cd <= 0) { e.st = 1; e.stT = 0.35; e.cx = nx; e.cy = ny; } }
+        else if (e.st === 1) { e.stT -= dt; if (e.stT <= 0) { e.st = 2; e.stT = 0.32; } }
+        else { mx = e.cx; my = e.cy; sp = 560 * slow; e.stT -= dt; if (e.stT <= 0) { e.st = 0; e.cd = 1.6 + Math.random(); } }
+        break;
+      case 'sniper': // держит дистанцию, прицеливается лучом
+        if (e.st === 0) { if (dist < 330) { mx = -nx; my = -ny; } else if (dist > 470) { mx = nx; my = ny; } else { mx = -ny * 0.4; my = nx * 0.4; }
+          if (e.cd <= 0 && dist < 560 && !hid) { e.st = 1; e.stT = 1.0; e.aa = Math.atan2(dy, dx); G.tele.push({ k: 'line', x1: e.x, y1: e.y, x2: e.x + Math.cos(e.aa) * 700, y2: e.y + Math.sin(e.aa) * 700, w: 10, t: 0, dur: 1.0, col: '#ff2a2a', dmg: 0, ally: true }); } }
+        else { e.stT -= dt; if (e.stT <= 0) { e.st = 0; e.cd = 3; for (let k = 0; k < 3; k++) G.ebullet(e.x, e.y, e.aa + (k - 1) * 0.02, 620, e.dmg); } }
+        break;
+      case 'tank': // медленный, бьёт ударной волной
+        mx = nx; my = ny;
+        if (e.cd <= 0 && dist < 200) { e.cd = 3.2; G.tele.push({ k: 'circle', x: e.x, y: e.y, r: 130, t: 0, dur: 0.9, col: '#c86bff', dmg: e.dmg }); G.shake(2); }
+        break;
+      case 'healer': { // держится за союзниками, чинит их
+        let best = null, bd = 1e9; for (const o of G.enemies) if (o !== e && !o.dead && o.hp < o.maxHp) { const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < bd) { bd = d; best = o; } }
+        if (best && bd > 90) { mx = best.x - e.x; my = best.y - e.y; } else if (dist < 260) { mx = -nx; my = -ny; }
+        if (best && bd < 160 && e.cd <= 0) { e.cd = 1.6; best.hp = Math.min(best.maxHp, best.hp + best.maxHp * 0.18); G.vfx.push({ k: 'beam', x1: e.x, y1: e.y, x2: best.x, y2: best.y, t: 0, d: 0.35, col: '#3dffb0' }); G.floatText(best.x, best.y - 20, '+', '#3dffb0'); }
+        break; }
+      case 'shielder': { // прикрывает союзников щитом
+        let cx = 0, cy = 0, n = 0; for (const o of G.enemies) if (o !== e && !o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 300) { cx += o.x; cy += o.y; n++; if (Math.hypot(o.x - e.x, o.y - e.y) < 140) o.shd = 0.3; }
+        if (n) { cx /= n; cy /= n; mx = (cx + (p.x - cx) * 0.3) - e.x; my = (cy + (p.y - cy) * 0.3) - e.y; if (Math.hypot(mx, my) < 20) { mx = 0; my = 0; } } else { mx = nx; my = ny; }
+        break; }
+      case 'miner': // бегает рядом и минирует путь
+        { const s = Math.sin(e.t * 1.5); mx = nx * 0.5 - ny * s; my = ny * 0.5 + nx * s; }
+        if (e.cd <= 0) { e.cd = 2.2; G.tele.push({ k: 'circle', x: e.x, y: e.y, r: 55, t: 0, dur: 2.0, col: '#ffcc33', dmg: e.dmg }); }
         break;
       case 'flee':
         mx = -nx + Math.sin(e.t * 2) * 0.6; my = -ny + Math.cos(e.t * 2.3) * 0.6; e.life -= dt;

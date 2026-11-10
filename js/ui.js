@@ -35,6 +35,7 @@ const UI = {
     G.ui = {
       onEnd: (R, res) => this.results(R, res),
       onPerk: (ch, n) => this.perk(ch, n),
+      onRoute: (nodes, n, ms) => this.routeMap(nodes, n, ms),
       onMerchant: () => this.merchant(),
       onPause: () => this.pause()
     };
@@ -472,6 +473,7 @@ const UI = {
       case 'wipe': this.ask('Удалить ВЕСЬ прогресс? Это нельзя отменить.', () => setTimeout(() => this.ask('Точно? Последнее предупреждение.', () => { SaveSys.wipe(); location.reload(); }), 50)); break;
       case 'resume': this.closeModal(); this.hideUI(); G.resume(); break;
       case 'quit': this.closeModal(); G.state = 'dying'; G.end(false); break;
+      case 'route': { const r = this.routes[+v]; this.closeModal(); SFX.play('portal'); G.chooseRoute(r); break; }
       case 'perk': { const pk = this.perks[+v]; this.closeModal(); G.takePerk(pk); break; }
       case 'mbuy': if (G.merchantBuy(+v)) this.merchant(); else this.toast({ n: 'Мало кредитов забега' }); break;
       case 'again': this.play(); break;
@@ -529,6 +531,15 @@ const UI = {
     this.showModal(`<h3>ПАУЗА</h3><div class="pst"><span>Сектор <b>${R.sector}</b></span><span>Убийств <b>${R.kills}</b></span><span>Кредиты <b>${R.coins}</b></span><span>Добыча <b>${R.loot.length}</b></span></div>
       <div class="fxlist">${[...cs.fx].map(f => '<span>⚡ ' + D.FX[f] + '</span>').join('') || '<span class="muted">Нет особых эффектов</span>'}</div>
       <div class="btns col"><button class="btn gold" data-a="resume">Продолжить</button><button class="btn red" data-a="quit">Завершить забег</button></div>`);
+  },
+  routeMap(nodes, n, ms) {
+    this.routes = nodes;
+    const res = ms ? `<div class="msres ${ms.ok ? 'ok' : ''}"><b>✓ ${ms.n}</b><span>+¤${ms.coins}</span><small>${ms.ok ? '★ Бонус выполнен: ' + ms.side + ' (+8 ◆)' : '☆ Бонус не выполнен: ' + ms.side}</small></div>` : '';
+    const ys = [18, 50, 82];
+    const lines = nodes.map((x, i) => `<path d="M 0 50 C 55 50, 45 ${ys[i]}, 100 ${ys[i]}" stroke="${x.col}" />`).join('');
+    this.showModal(`<div class="route"><h3>СЕКТОР ${n} ПРОЙДЕН</h3>${res}<p class="muted">Выберите путь — у каждого свой риск и награда</p>
+      <div class="rmap"><svg viewBox="0 0 100 100" preserveAspectRatio="none">${lines}</svg><div class="rnow"><i>◉</i><small>ВЫ ЗДЕСЬ</small></div>
+      <div class="rnodes">${nodes.map((x, i) => `<button class="rnode" data-a="route" data-v="${i}" style="--rc:${x.col};animation-delay:${0.15 + i * 0.12}s"><i>${x.ic}</i><div><b>${x.n}</b><small>${x.d}</small></div></button>`).join('')}</div></div></div>`);
   },
   perk(ch, n) {
     this.perks = ch;

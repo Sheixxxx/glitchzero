@@ -189,8 +189,9 @@ const G = {
     const ev = this.ev, rl = this.rules;
     const opt = {
       enMul: (rl.enMul || 1) * (ev.redcode ? 2 : 1), laserMul: (rl.laserMul || 1) * (this.mods.lasers ? 2 : 1), zoneMul: ev.anomaly,
-      coreMod: this.cs.core + (ev.void ? -2 : 0), extraChests: ev.treasure ? 3 : 0, extraSecret: this.cs.fx.has('sense') && r() < 0.3
+      coreMod: this.cs.core + (ev.void ? -2 : 0), extraChests: (ev.treasure ? 3 : 0) + ((this.route && this.route.chests) || 0), extraSecret: this.cs.fx.has('sense') && r() < 0.3
     };
+    if (this.route && this.route.enMul) opt.enMul *= this.route.enMul; if (this.route && this.route.shop) ev.merchant = true;
     const lv = this.lv = bossId ? LevelGen.genArena(seed, D.BIOMES[R.sector % 5]) : LevelGen.gen(seed, diff, opt);
     const fc = P.cos('field'); this.pal = fc.v || lv.biome;
     if (!bossId) this.stat('bio_' + lv.biome.id);
@@ -221,11 +222,96 @@ const G = {
     }
     if (evId) { const E = D.EVM[evId]; setTimeout(() => this.banner(E.n, E.c, 'СОБЫТИЕ', E.d), 1400); this.stat('events'); this.stat('ev_' + evId); }
     this.activeEvent = evId;
+    this.ms = null; if (!bossId) this.initMission(this.route); this.route = null;
     this.cam.x = p.x; this.cam.y = p.y;
     this.explored = new Uint8Array(lv.W * lv.H);
     R3.on = R3.active(); document.body.classList.toggle('r3d', R3.on);
     this.renderMap(); if (R3.on) { try { R3.build(this); } catch (e) { console.error(e); R3.on = false; document.body.classList.remove('r3d'); this.renderMap(); } }
     this.state = 'play';
+  },
+  /* ---------- Миссии сектора ---------- */
+  initMission(route) {
+    const lv = this.lv, rooms = lv.rooms.filter(q => q.type !== 'start'), st = lv.rooms.find(q => q.type === 'start') || lv.rooms[0];
+    const far = rooms.slice().sort((a, b) => Math.hypot(b.cx - st.cx, b.cy - st.cy) - Math.hypot(a.cx - st.cx, a.cy - st.cy));
+    const mid = far[Math.floor(far.length / 2)] || far[0], P0 = q => ({ x: q.cx * TS, y: q.cy * TS });
+    let k = route && route.ms;
+    if (!k) { const pool = ['cores', 'clear', 'hack', 'defend', 'survive', 'escort', 'artifact', 'escape', 'elite']; k = pool[Math.floor(Math.random() * pool.length)]; if (this.diff < 2) k = 'cores'; }
+    const M = { k, done: false, fail: false, kills: 0, t: 0 };
+    const INFO = {
+      cores: ['СБОР ЯДЕР', 'Соберите энергоядра для портала'], clear: ['ЗАЧИСТКА', 'Уничтожьте большую часть врагов'], hack: ['ВЗЛОМ СЕТИ', 'Взломайте 3 терминала'],
+      defend: ['ЗАЩИТА ГЕНЕРАТОРА', 'Запустите генератор и удержите 40 с'], survive: ['ВЫЖИВАНИЕ', 'Активируйте маяк и продержитесь 35 с'], escort: ['СОПРОВОЖДЕНИЕ', 'Доведите робота-курьера до портала'],
+      artifact: ['ПОТЕРЯННЫЙ АРТЕФАКТ', 'Найдите артефакт по сигналу'], escape: ['ПОБЕГ', 'Тревога! Доберитесь до портала за 60 с'], elite: ['ОХОТА', 'Найдите и уничтожьте элитную цель']
+    };
+    M.n = INFO[k][0]; M.d = INFO[k][1];
+    if (k === 'cores') M.goal = this.need;
+    else { this.pick = this.pick.filter(q => q.k !== 'core'); this.need = 0; }
+    if (k === 'clear') M.goal = Math.max(5, Math.ceil(this.enemies.length * 0.75));
+    if (k === 'hack') { while (lv.terms.length < 3 && rooms.length) { const q = rooms[Math.floor(Math.random() * rooms.length)]; lv.terms.push({ x: (q.cx + 1.5) * TS, y: q.cy * TS, prog: 0, done: false, k: ['emp', 'loot', 'ally', 'nuke'][lv.terms.length % 4] }); } M.goal = 3; }
+    if (k === 'defend') { M.gen = Object.assign(P0(mid), { hp: 500, max: 500, on: false, r: 26 }); M.tgt = M.gen; M.goal = 40; }
+    if (k === 'survive') { M.bea = Object.assign(P0(mid), { on: false }); M.tgt = M.bea; M.goal = 35; }
+    if (k === 'escort') { M.bot = Object.assign(P0(st), { hp: 320, max: 320, r: 18, i: 0 }); M.bot.x += 40; M.path = this.bfsPath(M.bot.x, M.bot.y, lv.portal.x, lv.portal.y); M.goal = M.path.length || 1; M.tgt = M.bot; }
+    if (k === 'artifact') { const q = far.find(z => z !== lv.portalRoom) || far[0]; M.art = Object.assign(P0(q), { got: false }); M.goal = 1; }
+    if (k === 'escape') { M.goal = 60; this.portalOpen = true; }
+    if (k === 'elite') { const q = far.find(z => z !== lv.portalRoom) || far[0], ty = ['guard', 'tank', 'hunter', 'shielder'][Math.floor(Math.random() * 4)]; const e = Enemies.make(this, ty, q.cx * TS, q.cy * TS, this.diff, true); e.aggro = false; this.enemies.push(e); M.elite = e; M.tgt = e; M.goal = 1; }
+    const sides = [['nohit', 'Без урона'], ['fast', 'Быстрее 90 с'], ['combo', 'Комбо ×15'], ['loot', 'Открыть все сундуки']];
+    M.side = sides[Math.floor(Math.random() * sides.length)];
+    if (route && route.loot) M.loot = route.loot;
+    this.ms = M; this.secCombo = 0;
+    setTimeout(() => { if (this.ms === M) this.banner(M.n, '#00f0ff', 'ЗАДАНИЕ', M.d + ' • Бонус: ' + M.side[1]); }, 2600);
+  },
+  bfsPath(x1, y1, x2, y2) {
+    const lv = this.lv, W = lv.W, s = Math.floor(y1 / TS) * W + Math.floor(x1 / TS), g = Math.floor(y2 / TS) * W + Math.floor(x2 / TS), prev = new Int32Array(lv.t.length).fill(-1), q = [s]; prev[s] = s;
+    const ok = i => { const v = lv.t[i]; return v === 0 || v === 4; };
+    for (let h = 0; h < q.length; h++) { const i = q[h]; if (i === g) break; const x = i % W; for (const j of [i - 1, i + 1, i - W, i + W]) { if (j < 0 || j >= lv.t.length || prev[j] !== -1) continue; if ((j === i - 1 && x === 0) || (j === i + 1 && x === W - 1)) continue; if (!ok(j)) continue; prev[j] = i; q.push(j); } }
+    if (prev[g] === -1) return []; const path = []; for (let i = g; i !== s; i = prev[i]) path.push({ x: (i % W + 0.5) * TS, y: (Math.floor(i / W) + 0.5) * TS }); return path.reverse();
+  },
+  waveSpawn(cx, cy, n) {
+    const L = this.lv.biome.en; for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, d = 260 + Math.random() * 120; let x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d; if (this.tileAt(x, y) !== 0) { x = cx + Math.cos(a) * 120; y = cy + Math.sin(a) * 120; } if (this.tileAt(x, y) !== 0) continue; const e = this.spawnEnemy(L[Math.floor(Math.random() * L.length)], x, y); e.aggro = true; this.burst(x, y, '#ff3d55', 12, 200); }
+  },
+  updMission(dt) {
+    const M = this.ms, p = this.p; if (!M || M.done || M.fail || this.boss) return;
+    M.t += dt; this.secCombo = Math.max(this.secCombo || 0, this.run.combo);
+    const finish = () => { M.done = true; M.tgt = null; this.portalOpen = true; this.banner('ЗАДАНИЕ ВЫПОЛНЕНО', '#3dffa0', M.n, 'Портал открыт'); SFX.play('ach'); this.shake(6); this.burst(p.x, p.y, '#3dffa0', 50, 400); };
+    const failf = (why) => { M.fail = true; M.tgt = null; this.portalOpen = true; this.banner('ЗАДАНИЕ ПРОВАЛЕНО', '#ff3d55', why, 'Портал открыт, но без награды'); SFX.play('lose'); };
+    switch (M.k) {
+      case 'cores': M.prog = this.coresHave; if (this.coresHave >= this.need) finish(); break;
+      case 'clear': M.prog = M.kills; if (M.kills >= M.goal) finish(); break;
+      case 'hack': M.prog = this.lv.terms.filter(t => t.done).length; if (M.prog >= 3) finish(); break;
+      case 'defend': { const g = M.gen;
+        if (!g.on) { M.prog = 0; if (Math.hypot(g.x - p.x, g.y - p.y) < 80) { g.on = true; M.wt = 0; this.banner('ГЕНЕРАТОР ЗАПУЩЕН', '#ffd23d', 'ЗАЩИТА', 'Враги идут к генератору!'); SFX.play('boss'); } break; }
+        M.prog = Math.min(M.goal, (M.prog || 0) + dt); M.wt -= dt; if (M.wt <= 0) { M.wt = 5; this.waveSpawn(g.x, g.y, 3 + Math.floor(this.diff / 4)); this.enemies.forEach(e => { if (Math.hypot(e.x - g.x, e.y - g.y) < 600) e.tgt = g; }); }
+        for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - g.x, e.y - g.y) < e.r + g.r + 6) g.hp -= e.dmg * dt * 1.3;
+        for (const b of this.eb) if (Math.hypot(b.x - g.x, b.y - g.y) < g.r) { g.hp -= b.dmg * 0.6; b.life = 0; }
+        if (g.hp <= 0) { this.burst(g.x, g.y, '#ff8a00', 60, 420); this.shake(10); failf('Генератор уничтожен'); this.enemies.forEach(e => e.tgt = null); } else if (M.prog >= M.goal) { finish(); this.enemies.forEach(e => e.tgt = null); }
+        break; }
+      case 'survive': { const b = M.bea;
+        if (!b.on) { M.prog = 0; if (Math.hypot(b.x - p.x, b.y - p.y) < 70) { b.on = true; M.wt = 0; M.tgt = null; this.banner('МАЯК АКТИВИРОВАН', '#ff3d55', 'ВЫЖИВАНИЕ', 'Держитесь!'); SFX.play('boss'); } break; }
+        M.prog = Math.min(M.goal, (M.prog || 0) + dt); M.wt -= dt; if (M.wt <= 0) { M.wt = 4.5; this.waveSpawn(p.x, p.y, 3 + Math.floor(this.diff / 3)); }
+        if (M.prog >= M.goal) finish(); break; }
+      case 'escort': { const b = M.bot, nxt = M.path[b.i];
+        const near = Math.hypot(b.x - p.x, b.y - p.y) < 220; b.moving = near && !!nxt;
+        if (b.moving) { const dx = nxt.x - b.x, dy = nxt.y - b.y, d = Math.hypot(dx, dy); const sp = 85 * dt; if (d < sp) { b.x = nxt.x; b.y = nxt.y; b.i++; } else { b.x += dx / d * sp; b.y += dy / d * sp; } b.ang = Math.atan2(dy, dx); }
+        for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - b.x, e.y - b.y) < e.r + b.r + 6) b.hp -= e.dmg * dt * 1.2;
+        for (const q of this.eb) if (Math.hypot(q.x - b.x, q.y - b.y) < b.r) { b.hp -= q.dmg * 0.5; q.life = 0; }
+        if (this.frame % 90 === 0) this.enemies.forEach(e => { if (!e.dead && Math.hypot(e.x - b.x, e.y - b.y) < 300 && Math.random() < 0.4) e.tgt = b; });
+        M.prog = b.i; if (b.hp <= 0) { this.burst(b.x, b.y, '#ff8a00', 50, 380); this.shake(8); failf('Курьер уничтожен'); } else if (!nxt || Math.hypot(b.x - this.lv.portal.x, b.y - this.lv.portal.y) < 40) finish();
+        break; }
+      case 'artifact': { const a = M.art; M.dist = Math.hypot(a.x - p.x, a.y - p.y); M.prog = 0;
+        if (M.dist < 34 && !a.got) { a.got = true; M.prog = 1; R3 && this.burst(a.x, a.y, '#ffd23d', 60, 400); this.run.loot.push(P.rollItem(0.6, 2)); this.waveSpawn(a.x, a.y, 4); finish(); }
+        break; }
+      case 'escape': M.prog = Math.min(M.goal, M.t); if (M.t > M.goal) { if (this.frame % 30 === 0) this.hurtPlayer(6, null); } M.wt = (M.wt || 3) - dt; if (M.wt <= 0) { M.wt = 4; this.waveSpawn(p.x, p.y, 2 + Math.floor(this.diff / 4)); } break;
+      case 'elite': M.prog = M.elite.dead ? 1 : 0; if (M.elite.dead) finish(); break;
+    }
+  },
+  missionReward() {
+    const M = this.ms, R = this.run; if (!M) return;
+    if (M.k === 'escape' && !M.fail) M.done = true;
+    if (!M.done || M.fail) return;
+    const base = 25 + this.diff * 4; R.coins += base; R.xp += 20 + this.diff * 5;
+    const s = M.side[0], ok = s === 'nohit' ? this.secDmg === 0 : s === 'fast' ? this.secTime < 90 : s === 'combo' ? (this.secCombo || 0) >= 15 : this.chests.every(c => c.open);
+    if (ok) { P.s.gems += 8; R.coins += base; this.stat('perfectMissions'); }
+    if (M.loot) R.loot.push(P.rollItem(0.5 + this.cs.luck, 2));
+    this.lastMs = { n: M.n, coins: base * (ok ? 2 : 1), side: M.side[1], ok };
   },
   pickEvent() {
     const L = D.EVENTS, tot = L.reduce((a, e) => a + e.w * (e.rare ? 1 + this.cs.luck : 1), 0);
@@ -504,6 +590,7 @@ const G = {
   hurtEnemy(e, dmg, o) {
     if (e.dead) return;
     let c = false; if (!o.noFx) { c = this.crit(); if (c) dmg *= this.cs.critd; dmg *= this.dmgMul(); }
+    if (e.shd > 0) dmg *= 0.5;
     e.hp -= dmg; e.flash = 0.08; e.aggro = true; this.stat('damage', dmg);
     if (!o.noFx) {
       this.p.sup = Math.min(1, this.p.sup + dmg / 380 * this.cs.sup);
@@ -525,7 +612,9 @@ const G = {
     if (e.dead) return; e.dead = true; const R = this.run, d = D.EN[e.type];
     this.burst(e.x, e.y, e.col, 16, 260); SFX.play('kill');
     if (e.type === 'glitch') { this.stat('glitchKills'); P.s.gems += 25; this.banner('ГЛЮК ПОЙМАН!', '#ffd700', '+25 осколков'); for (let i = 0; i < 20; i++) this.dropCoin(e.x, e.y, 3); R.loot.push(P.rollItem(0.5, 3)); }
-    R.kills++; this.stat('kills'); this.stat('k_' + e.type); if (e.type === 'guard') this.stat('eliteKills');
+    R.kills++; this.stat('kills'); this.stat('k_' + e.type); if (e.type === 'guard' || e.elite) this.stat('eliteKills');
+    if (e.elite) { this.banner('ЭЛИТА ПОВЕРЖЕНА', '#ffd23d', 'НАГРАДА', '+15 осколков и предмет'); P.s.gems += 15; for (let i = 0; i < 14; i++) this.dropCoin(e.x, e.y, 3); R.loot.push(P.rollItem(0.4 + this.cs.luck, 2)); this.pick.push({ k: 'heal', x: e.x, y: e.y, t: 0 }); this.shake(10); this.burst(e.x, e.y, '#ffd23d', 60, 420); this.vfx.push({ k: 'ring', x: e.x, y: e.y, r: 160, t: 0, d: 0.6, col: '#ffd23d' }); }
+    if (this.ms) this.ms.kills = (this.ms.kills || 0) + 1;
     R.comboT > 0 ? R.combo++ : (R.combo = 1); R.comboT = this.cs.combo; R.maxCombo = Math.max(R.maxCombo, R.combo);
     P.statMax('maxCombo', R.combo); if (R.combo > P.s.daily.maxCombo) P.s.daily.maxCombo = R.combo;
     const cm = 1 + Math.min(R.combo, 50) * 0.02;
@@ -706,7 +795,8 @@ const G = {
     // торговец
     if (this.merchant && !this.merchant.used && Math.hypot(this.merchant.x - p.x, this.merchant.y - p.y) < 40) { this.merchant.used = true; this.state = 'menu'; this.ui.onMerchant && this.ui.onMerchant(); }
     // портал
-    if (!this.portalOpen && this.coresHave >= this.need && !this.boss) { this.portalOpen = true; this.banner('ПОРТАЛ ОТКРЫТ', '#3dffa0'); SFX.play('portal'); }
+    this.updMission(dt);
+    if (!this.portalOpen && !this.ms && this.coresHave >= this.need && !this.boss) { this.portalOpen = true; this.banner('ПОРТАЛ ОТКРЫТ', '#3dffa0'); SFX.play('portal'); }
     if (this.portalOpen && Math.hypot(lv.portal.x - p.x, lv.portal.y - p.y) < 34) this.sectorClear();
     // частицы
     for (const q of this.parts) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.92; q.vy *= 0.92; }
@@ -768,6 +858,7 @@ const G = {
   },
   sectorClear() {
     const R = this.run; this.state = 'menu'; SFX.play('portal'); this.stat('sectors');
+    this.missionReward();
     if (this.secDmg === 0) { this.stat('perfect'); }
     if (R.lowhp && this.p.hp > 0) this.stat('lowhp');
     R.lowhp = false;
@@ -778,9 +869,21 @@ const G = {
     if (R.sector >= this.total) { this.end(true); return; }
     if (!this.rules.noHeal) this.p.hp = Math.min(this.p.maxHp, this.p.hp + this.p.maxHp * 0.3);
     const pool = PERKS.slice(), ch = []; for (let i = 0; i < 3; i++) ch.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-    this.ui.onPerk(ch, R.sector);
+    this.perkCh = ch; this.ui.onRoute(this.routeNodes(), R.sector, this.lastMs); this.lastMs = null;
   },
   takePerk(pk) { pk.f(this.cs, this); this.nextSector(); },
+  routeNodes() {
+    const T = [
+      { k: 'fight', n: 'Боевая зона', d: 'Случайное задание, обычная награда', ic: '⚔', col: '#00f0ff' },
+      { k: 'danger', n: 'Опасная зона', d: 'Врагов ×1.6, предмет в награду', ic: '☠', col: '#ff3d55', enMul: 1.6, loot: 1 },
+      { k: 'elite', n: 'Элитная охота', d: 'Элитная цель, редкая награда', ic: '♛', col: '#ffd23d', ms: 'elite', loot: 1 },
+      { k: 'treasure', n: 'Сокровищница', d: 'Мало врагов, много сундуков', ic: '◈', col: '#ffb020', ms: 'artifact', enMul: 0.6, chests: 4 },
+      { k: 'shop', n: 'Чёрный рынок', d: 'Торговец в секторе', ic: '¤', col: '#b44dff', shop: 1, enMul: 0.8 },
+      { k: 'rest', n: 'Комната отдыха', d: '+60% здоровья сейчас, тихий сектор', ic: '✚', col: '#3dffa0', heal: 0.6, enMul: 0.5, ms: 'cores' }
+    ];
+    const a = T.slice(), out = [a.shift()]; while (out.length < 3) out.push(a.splice(Math.floor(Math.random() * a.length), 1)[0]); return out.sort(() => Math.random() - 0.5);
+  },
+  chooseRoute(r) { this.route = r; if (r.heal && !this.rules.noHeal) this.p.hp = Math.min(this.p.maxHp, this.p.hp + this.p.maxHp * r.heal); this.ui.onPerk(this.perkCh, this.run.sector); },
   die() { if (this.state !== 'play') return; this.state = 'dying'; SFX.play('lose'); SFX.vib([80, 50, 160]); this.burst(this.p.x, this.p.y, this.cs.hero.col, 80, 500); setTimeout(() => this.end(false), 1300); },
   end(win) {
     const R = this.run; this.state = 'off'; SFX.mode('menu');
@@ -1037,6 +1140,7 @@ const G = {
       case 'bomber': c.beginPath(); c.arc(0, 0, r, 0, 6.28); c.fill(); c.stroke(); if (e.st === 1 && Math.floor(T * 14) % 2) { c.fillStyle = '#fff'; c.fill(); c.strokeStyle = '#ff8a00'; c.beginPath(); c.arc(0, 0, 80, 0, 6.28); c.stroke(); } c.fillStyle = col; c.fillRect(-2, -r - 7, 4, 7); c.fillStyle = '#ffd23d'; c.beginPath(); c.arc(0, -r - 8, 3 + Math.random() * 2, 0, 6.28); c.fill(); break;
       case 'splitter': c.save(); c.rotate(T); c.fillRect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4); c.strokeRect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4); c.rotate(0.78); c.strokeRect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4); c.restore(); break;
       case 'glitch': c.fillStyle = '#ffd700'; c.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28 + T * 4, rr = i % 2 ? r * 0.5 : r * 1.2; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.fill(); break;
+      default: c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + T; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke(); break;
     }
     // глаз
     if (e.type !== 'glitch') { const er = r * 0.34, ex = Math.cos(pa) * r * 0.18, ey = Math.sin(pa) * r * 0.18; c.fillStyle = '#ffe6ee'; c.beginPath(); c.arc(ex, ey, er, 0, 6.28); c.fill(); c.fillStyle = col; c.beginPath(); c.arc(ex + Math.cos(pa) * er * 0.4, ey + Math.sin(pa) * er * 0.4, er * 0.55, 0, 6.28); c.fill(); c.fillStyle = '#000'; c.beginPath(); c.arc(ex + Math.cos(pa) * er * 0.5, ey + Math.sin(pa) * er * 0.5, er * 0.25, 0, 6.28); c.fill(); }
@@ -1067,13 +1171,26 @@ const G = {
     if (p.shield > 0) { c.fillStyle = 'rgba(120,200,255,0.8)'; c.fillRect(safe + 8, safe + 8, Math.min(hw - 16, (hw - 16) * p.shield / p.maxHp), 4); }
     c.fillStyle = '#fff'; c.font = 'bold 10px Unbounded,sans-serif'; c.textAlign = 'left'; c.fillText(Math.ceil(p.hp) + ' / ' + p.maxHp, safe + 12, safe + 14.5);
     c.fillStyle = '#00f0ff'; c.font = 'bold 12px Unbounded,sans-serif';
-    c.fillText(this.boss ? '☗ БОСС' : '◆ ' + this.coresHave + '/' + this.need, safe + 8, safe + 34);
+    c.fillText(this.boss ? '☗ БОСС' : this.ms ? '◆ ' + R.cores : '◆ ' + this.coresHave + '/' + this.need, safe + 8, safe + 34);
     c.fillStyle = '#ffd23d'; c.fillText('¤ ' + R.coins, safe + 82, safe + 34);
     c.fillStyle = '#aab'; c.font = '10px Unbounded,sans-serif'; c.textAlign = 'right';
     const tm = this.rules.timeLimit ? Math.max(0, this.rules.timeLimit - R.time) : R.time;
     c.fillText(Math.floor(tm / 60) + ':' + String(Math.floor(tm % 60)).padStart(2, '0'), safe + hw - 8, safe + 34);
     // модификаторы
-    let my = safe + 58; c.textAlign = 'left'; c.font = '10px Manrope,sans-serif';
+    let my = safe + 58;
+    const M = this.ms; if (M && !this.boss) {
+      const done = M.done, fail = M.fail, col = fail ? '#ff3d55' : done ? '#3dffa0' : '#00f0ff', f = Math.min(1, (M.prog || 0) / (M.goal || 1));
+      c.fillStyle = 'rgba(5,5,15,0.78)'; this.rr(c, safe, my, hw, 52, 10); c.fill(); c.strokeStyle = col; c.globalAlpha = 0.5 + Math.sin(T * 4) * 0.2; c.lineWidth = 1.5; this.rr(c, safe, my, hw, 52, 10); c.stroke(); c.globalAlpha = 1;
+      c.textAlign = 'left'; c.font = 'bold 10px Unbounded,sans-serif'; c.fillStyle = col; c.fillText((done ? '✓ ' : fail ? '✕ ' : '▸ ') + M.n, safe + 8, my + 12);
+      let txt = ''; if (M.k === 'artifact' && !done) { const d = M.dist || 9999; txt = 'СИГНАЛ: ' + (d < 300 ? '█████ рядом!' : d < 600 ? '███░░ сильный' : d < 1000 ? '██░░░ средний' : '█░░░░ слабый'); } else if (M.k === 'defend' && M.gen && M.gen.on) txt = 'Генератор ' + Math.max(0, Math.ceil(M.gen.hp / M.gen.max * 100)) + '%  •  ' + Math.ceil(M.goal - M.prog) + ' с'; else if (M.k === 'defend' || M.k === 'survive') txt = (M.k === 'defend' ? (M.gen.on ? '' : 'Подойдите к генератору') : (M.bea.on ? 'Осталось ' + Math.ceil(M.goal - M.prog) + ' с' : 'Найдите маяк')); else if (M.k === 'escort') txt = 'Курьер ' + Math.max(0, Math.ceil(M.bot.hp / M.bot.max * 100)) + '%  ' + (M.bot.moving ? '▶ идёт' : '■ ждёт вас'); else if (M.k === 'escape') txt = M.t > M.goal ? 'ВРЕМЯ ВЫШЛО — уходите!' : 'Осталось ' + Math.ceil(M.goal - M.t) + ' с'; else txt = Math.floor(M.prog || 0) + ' / ' + M.goal;
+      if (done) txt = 'Портал открыт'; if (fail) txt = 'Провалено';
+      c.font = '10px Manrope,sans-serif'; c.fillStyle = '#dde'; c.fillText(txt, safe + 8, my + 26);
+      c.fillStyle = '#1a1a2a'; c.fillRect(safe + 8, my + 34, hw - 16, 4); c.fillStyle = col; c.fillRect(safe + 8, my + 34, (hw - 16) * (M.k === 'escape' ? 1 - f : f), 4);
+      const so = M.side[0] === 'nohit' ? this.secDmg === 0 : M.side[0] === 'fast' ? this.secTime < 90 : M.side[0] === 'combo' ? (this.secCombo || 0) >= 15 : this.chests.every(q => q.open);
+      c.font = '9px Manrope,sans-serif'; c.fillStyle = so ? '#ffd23d' : '#8889a0'; c.fillText((so ? '★ ' : '☆ ') + 'Бонус: ' + M.side[1], safe + 8, my + 46);
+      my += 58;
+    }
+    c.textAlign = 'left'; c.font = '10px Manrope,sans-serif';
     const tags = Object.keys(this.mods).map(k => D.MODS.find(m => m.id === k).n); if (this.activeEvent) tags.unshift('⚠ ' + D.EVM[this.activeEvent].n);
     tags.forEach(t => { c.fillStyle = 'rgba(5,5,15,0.6)'; const tw = c.measureText(t).width + 12; this.rr(c, safe, my, tw, 18, 6); c.fill(); c.fillStyle = t[0] === '⚠' ? '#ffb020' : '#b9a6ff'; c.fillText(t, safe + 6, my + 9); my += 21; });
     // комбо
@@ -1092,7 +1209,7 @@ const G = {
     }
     // стрелка-навигатор
     let tg = null;
-    if (this.portalOpen) tg = this.lv.portal; else if (!this.boss) { let bd = 1e12; for (const q of this.pick) if (q.k === 'core') { const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d < bd) { bd = d; tg = q; } } }
+    if (this.ms && this.ms.tgt && !this.ms.done && !this.ms.fail) tg = this.ms.tgt; else if (this.ms && this.ms.k === 'hack' && !this.ms.done) { let bd = 1e12; for (const q of this.lv.terms) if (!q.done) { const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d < bd) { bd = d; tg = q; } } } else if (this.portalOpen) tg = this.lv.portal; else if (!this.boss) { let bd = 1e12; for (const q of this.pick) if (q.k === 'core') { const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d < bd) { bd = d; tg = q; } } }
     if (tg) { const pq = this.proj(tg.x, tg.y), sx = pq.x, sy = pq.y; if (sx < 20 || sy < 20 || sx > W - 20 || sy > H - 20) { const a = Math.atan2(sy - H / 2, sx - W / 2), rx = W / 2 - 40, ry = H / 2 - 60, t = Math.min(Math.abs(rx / Math.cos(a)), Math.abs(ry / Math.sin(a))); c.save(); c.translate(W / 2 + Math.cos(a) * t, H / 2 + Math.sin(a) * t); c.rotate(a); c.fillStyle = this.portalOpen ? '#3dffa0' : '#00f0ff'; c.globalAlpha = 0.6 + Math.sin(T * 6) * 0.3; c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-4, 0); c.lineTo(-8, 10); c.closePath(); c.fill(); c.restore(); } }
     // баннер
     if (this.bn) { const b = this.bn; b.t += 1 / 60; const f = b.t < 0.25 ? b.t / 0.25 : b.t > 2.2 ? Math.max(0, 1 - (b.t - 2.2) / 0.4) : 1; if (b.t > 2.6) this.bn = null; else { c.globalAlpha = f; c.textAlign = 'center'; const y = H * 0.3; if (b.sub) { c.font = 'bold 11px Unbounded,sans-serif'; c.fillStyle = '#aab'; c.fillText(b.sub, W / 2, y - 26); } c.font = '900 ' + Math.min(34, W / 12) + 'px Unbounded,sans-serif'; c.fillStyle = b.col; this.glow(c, b.col, 20); c.fillText(b.s, W / 2 + (1 - f) * 40, y); this.glow(c, 0, 0); if (b.d2) { c.font = '12px Manrope,sans-serif'; c.fillStyle = '#dde'; c.fillText(b.d2, W / 2, y + 28); } c.globalAlpha = 1; } }

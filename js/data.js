@@ -76,6 +76,12 @@ D.EN = {
   guard: { n: 'Страж', hp: 170, spd: 65, dmg: 20, r: 22, col: '#b44dff', ai: 'charge', xp: 10 },
   bomber: { n: 'Бомбер', hp: 30, spd: 135, dmg: 28, r: 13, col: '#ff8a00', ai: 'bomb', xp: 5 },
   splitter: { n: 'Делитель', hp: 80, spd: 85, dmg: 12, r: 19, col: '#3dffa0', ai: 'chase', split: true, xp: 8 },
+  hunter: { n: 'Охотник', hp: 55, spd: 150, dmg: 14, r: 13, col: '#ff2a6a', ai: 'hunter', xp: 7 },
+  sniper: { n: 'Снайпер', hp: 45, spd: 90, dmg: 26, r: 13, col: '#ff4040', ai: 'sniper', xp: 8 },
+  tank: { n: 'Танк', hp: 420, spd: 45, dmg: 30, r: 28, col: '#c86bff', ai: 'tank', xp: 16 },
+  healer: { n: 'Ремонтник', hp: 70, spd: 100, dmg: 6, r: 14, col: '#3dffb0', ai: 'healer', xp: 9 },
+  shielder: { n: 'Щитоносец', hp: 140, spd: 75, dmg: 12, r: 18, col: '#4da6ff', ai: 'shielder', xp: 10 },
+  miner: { n: 'Минёр', hp: 60, spd: 110, dmg: 22, r: 14, col: '#ffcc33', ai: 'miner', xp: 8 },
   glitch: { n: 'Золотой Глюк', hp: 160, spd: 250, dmg: 0, r: 15, col: '#ffd700', ai: 'flee', xp: 60 }
 };
 
@@ -84,7 +90,12 @@ D.BIOMES = [
   { id: 'circuit', n: 'Схема', floor: '#03100e', line: '#0b2b27', wall: '#08302b', edge: '#00ffc8', en: ['worm', 'turret', 'turret', 'drone', 'bomber'] },
   { id: 'crystal', n: 'Кристалл', floor: '#0a0614', line: '#22113a', wall: '#2c0f46', edge: '#ff3dc8', en: ['bug', 'guard', 'splitter', 'drone'] },
   { id: 'void', n: 'Пустота', floor: '#020205', line: '#0e0e1c', wall: '#0c0c22', edge: '#3d7bff', en: ['bomber', 'worm', 'guard', 'drone', 'splitter'] },
-  { id: 'core', n: 'Ядро', floor: '#100404', line: '#2b0c0c', wall: '#3a0b14', edge: '#ff3d55', en: ['bug', 'guard', 'turret', 'bomber', 'splitter'] }
+  { id: 'core', n: 'Ядро', floor: '#100404', line: '#2b0c0c', wall: '#3a0b14', edge: '#ff3d55', en: ['bug', 'guard', 'turret', 'bomber', 'splitter', 'tank'] },
+  { id: 'factory', n: 'Заброшенная фабрика', floor: '#0e0a06', line: '#2a1e10', wall: '#3a2a16', edge: '#ff9a1a', en: ['bug', 'miner', 'tank', 'turret', 'hunter'] },
+  { id: 'lab', n: 'Секретная лаборатория', floor: '#06100e', line: '#103028', wall: '#14382f', edge: '#3dffb0', en: ['healer', 'drone', 'sniper', 'splitter', 'bug'] },
+  { id: 'city', n: 'Киберпанк-город', floor: '#0a0612', line: '#2a1040', wall: '#2a0f3a', edge: '#ff3dc8', en: ['hunter', 'sniper', 'drone', 'worm', 'shielder'] },
+  { id: 'frost', n: 'Замороженный комплекс', floor: '#060a12', line: '#14243a', wall: '#1a3048', edge: '#9fe8ff', en: ['shielder', 'tank', 'drone', 'sniper', 'healer'] },
+  { id: 'station', n: 'Космическая станция', floor: '#05060c', line: '#141a30', wall: '#1c2240', edge: '#6aa8ff', en: ['drone', 'sniper', 'hunter', 'miner', 'shielder'] }
 ];
 
 // [id, имя, слот, редкость, иконка, статы, эффект]
