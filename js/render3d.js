@@ -611,6 +611,24 @@ const R3 = {
       else if (k.k === 'heal' && nh < 60) { d.position.set(x, 0.5 + Math.sin(T * 3 + k.t) * 0.08, z); d.rotation.set(0, T, 0); d.scale.setScalar(1); d.updateMatrix(); this.iHeal.setMatrixAt(nh, d.matrix); this.iHeal2.setMatrixAt(nh++, d.matrix); this.gp(x, 0.5, z, '#3dffa0', 1, 0.5); }
     }
     for (const [m, c] of [[this.iCore, nc], [this.iCoin, nn], [this.iHeal, nh], [this.iHeal2, nh]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
+    if (!this.relPool) { this.relPool = []; this.relGeo = new THREE.OctahedronGeometry(0.22, 0); this.powGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.36, 6); }
+    this.relPool.u = 0;
+    for (const k of G.pick) {
+      if (k.k !== 'relic' && k.k !== 'pow') continue; const x = k.x / TS, z = k.y / TS; if (!vis(x, z, 1)) continue;
+      const col = Relic.pcol(k), y = 0.75 + Math.sin(T * 2.5 + x) * 0.12;
+      const m = this.use(this.relPool, () => new THREE.Mesh(this.relGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0.6 })));
+      m.geometry = k.k === 'relic' ? this.relGeo : this.powGeo; m.material.color.copy(this.C(col)); m.material.emissive.copy(this.C(col)); m.position.set(x, y, z); m.rotation.set(k.k === 'pow' ? 0.4 : 0, T * 2, k.k === 'pow' ? 0.3 : 0); m.scale.setScalar(k.k === 'relic' ? 1.1 : 1);
+      this.gp(x, y, z, col, k.k === 'relic' ? 2 : 1.2, 0.7); this.ring(x, z, 0.45, col, 0.5 + Math.sin(T * 4) * 0.2);
+      if (k.k === 'relic') { this.box(x, 1.6, z, 0.12, 3.2, 0.12, col, 0.25); for (let i = 0; i < 2; i++) { const ph = (T * 0.8 + i / 2) % 1; this.gp(x + Math.cos(T * 3 + i * 3) * 0.3, 0.1 + ph * 2.2, z + Math.sin(T * 3 + i * 3) * 0.3, col, 0.2, 1 - ph); } }
+    }
+    for (let i = this.relPool.u; i < this.relPool.length; i++) this.relPool[i].visible = false;
+    if (G.dronePos) { const dp = G.dronePos, x = dp.x / TS, z = dp.y / TS, y = 1.3 + Math.sin(T * 5) * 0.08;
+      if (!this.drG) { const g = new THREE.Group(), b = new THREE.Mesh(this.RB(0.3, 0.12, 0.3), this.S('#e8e6f4', 0.5, 0.3, 0.1)); g.add(b); for (const s of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.015, 6, 16), this.M('#00f0ff', { basic: 1 })); r.rotation.x = Math.PI / 2; r.position.set(s[0] * 0.2, 0.04, s[1] * 0.2); g.add(r); } const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), this.M('#00f0ff', { basic: 1 })); eye.position.set(0.16, -0.02, 0); g.add(eye); this.scene.add(g); this.drG = g; }
+      this.drG.visible = true; this.drG.position.set(x, y, z); this.drG.rotation.y = -p.ang; this.gp(x, y - 0.1, z, '#00f0ff', 0.6, 0.6); }
+    else if (this.drG) this.drG.visible = false;
+    if (G.pows && G.pows.zap > 0) for (let i = 0; i < 4; i++) { const a = Math.random() * 6.28; this.gp(px + Math.cos(a) * 0.5, 0.3 + Math.random() * 0.8, pz + Math.sin(a) * 0.5, '#9ff', 0.25, 1); }
+    if (G.pows && G.pows.inv > 0) this.ring(px, pz, 0.7, '#ffffff', 0.5 + Math.sin(T * 10) * 0.3, 0.5);
+    if (G.pows && G.pows.gold > 0) this.gp(px, 1.8, pz, '#ffd23d', 0.8, 0.7);
     // лазеры
     for (const L of lv.lasers) {
       if (L.k === 'rot') { if (!vis(L.x / TS, L.y / TS, 6)) continue; for (let i = 0; i < L.arms * 2; i++) { const a = L.a + i * Math.PI / L.arms; this.laser(L.x / TS, L.y / TS, (L.x + Math.cos(a) * L.len) / TS, (L.y + Math.sin(a) * L.len) / TS, '#ff2a5a'); } this.box(L.x / TS, 0.3, L.y / TS, 0.35, 0.6, 0.35, '#ff3d55', 0.8); }

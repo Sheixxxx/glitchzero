@@ -154,7 +154,7 @@ const G = {
     this.total = total;
     const hpMax = rules.oneHp ? 1 : this.cs.maxHp;
     this.p = { x: 0, y: 0, r: 16, hp: hpMax, maxHp: hpMax, ammo: this.cs.ammo, ammoT: 0, sup: 0, shield: 0, inv: 0, dashCd: 0, dashT: 0, dvx: 0, dvy: 0, ang: 0, shots: 0, still: 0, moved: false };
-    this.run = { mode: cfg.mode, hero: s.hero, stage: cfg.stage || 0, chId: cfg.chId, boss: cfg.boss, sector: 0, kills: 0, cores: 0, coins: 0, xp: 0, loot: [], time: 0, combo: 0, comboT: 0, maxCombo: 0, revived: false, dmgTaken: 0, lowhp: false };
+    this.run = { mode: cfg.mode, hero: s.hero, stage: cfg.stage || 0, chId: cfg.chId, boss: cfg.boss, sector: 0, kills: 0, cores: 0, coins: 0, xp: 0, loot: [], time: 0, combo: 0, comboT: 0, maxCombo: 0, revived: false, dmgTaken: 0, lowhp: false, rel: new Set(), syn: new Set() }; this.pows = {}; this.relCard = null;
     this.stat('runs'); this.stat('m_' + cfg.mode);
     SFX.mode('game');
     this.nextSector();
@@ -318,7 +318,7 @@ const G = {
         M.prog = b.i; if (b.hp <= 0) { this.burst(b.x, b.y, '#ff8a00', 50, 380); this.shake(8); failf('Курьер уничтожен'); } else if (!nxt || Math.hypot(b.x - this.lv.portal.x, b.y - this.lv.portal.y) < 40) finish();
         break; }
       case 'artifact': { const a = M.art; M.dist = Math.hypot(a.x - p.x, a.y - p.y); M.prog = 0;
-        if (M.dist < 34 && !a.got) { a.got = true; M.prog = 1; R3 && this.burst(a.x, a.y, '#ffd23d', 60, 400); this.run.loot.push(P.rollItem(0.6, 2)); this.waveSpawn(a.x, a.y, 4); finish(); }
+        if (M.dist < 34 && !a.got) { a.got = true; M.prog = 1; this.burst(a.x, a.y, '#ffd23d', 60, 400); this.run.loot.push(P.rollItem(0.6, 2)); Relic.drop(this, a.x, a.y + 30); this.waveSpawn(a.x, a.y, 4); finish(); }
         break; }
       case 'escape': M.prog = Math.min(M.goal, M.t); if (M.t > M.goal) { if (this.frame % 30 === 0) this.hurtPlayer(6, null); } M.wt = (M.wt || 3) - dt; if (M.wt <= 0) { M.wt = 4; this.waveSpawn(p.x, p.y, 2 + Math.floor(this.diff / 4)); } break;
       case 'elite': M.prog = M.elite.dead ? 1 : 0; if (M.elite.dead) finish(); break;
@@ -330,7 +330,7 @@ const G = {
     if (!M.done || M.fail) return;
     const base = 25 + this.diff * 4; R.coins += base; R.xp += 20 + this.diff * 5;
     const s = M.side[0], ok = s === 'nohit' ? this.secDmg === 0 : s === 'fast' ? this.secTime < 90 : s === 'combo' ? (this.secCombo || 0) >= 15 : this.chests.every(c => c.open);
-    if (ok) { P.s.gems += 8; R.coins += base; this.stat('perfectMissions'); }
+    if (ok) { P.s.gems += 8; R.coins += base; this.stat('perfectMissions'); const id = Relic.roll(this); if (id) Relic.gain(this, id); }
     if (M.loot) R.loot.push(P.rollItem(0.5 + this.cs.luck, 2));
     this.lastMs = { n: M.n, coins: base * (ok ? 2 : 1), side: M.side[1], ok };
   },
@@ -462,6 +462,7 @@ const G = {
       for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) this.dropCoin(cx, cy, 1);
       if (Math.random() < 0.18 && !this.rules.noHeal) this.pick.push({ k: 'heal', x: cx, y: cy, t: 0 });
       if (Math.random() < 0.05) this.pick.push({ k: 'core', x: cx, y: cy, t: 0 });
+      if (Math.random() < 0.14) Relic.dropPow(this, cx, cy);
       return;
     }
     if (v === 6) {
@@ -577,6 +578,7 @@ const G = {
       });
       if (delay) setTimeout(() => { if (this.state === 'play') mk(); }, delay * 1000); else mk();
     }
+    Relic.onFire(this, ang);
   },
   doSuper(ang) {
     const p = this.p, cs = this.cs, H = cs.hero; if (p.sup < 1 || this.state !== 'play') return;
@@ -607,11 +609,12 @@ const G = {
     p.inv = Math.max(p.inv, this.cs.fx.has('ghost') ? 1 : 0.2); this.stat('dashes'); SFX.play('dash');
   },
   crit() { return Math.random() < this.cs.crit; },
-  dmgMul() { return ((this.cs.fx.has('laststand') && this.p.hp < this.p.maxHp * 0.3) ? 1.4 : 1) * (this.buff && this.buff.rage > 0 ? 1.6 : 1); },
+  dmgMul() { return ((this.cs.fx.has('laststand') && this.p.hp < this.p.maxHp * 0.3) ? 1.4 : 1) * (this.buff && this.buff.rage > 0 ? 1.6 : 1) * Relic.dmgMul(this); },
   hurtEnemy(e, dmg, o) {
     if (e.dead) return;
     let c = false; if (!o.noFx) { c = this.crit(); if (c) dmg *= this.cs.critd; dmg *= this.dmgMul(); }
     if (e.shd > 0) dmg *= 0.5;
+    if (!o.noFx) Relic.onHit(this, e);
     e.hp -= dmg; e.flash = 0.08; e.aggro = true; this.stat('damage', dmg);
     if (!o.noFx) {
       this.p.sup = Math.min(1, this.p.sup + dmg / 380 * this.cs.sup);
@@ -636,6 +639,7 @@ const G = {
     R.kills++; this.stat('kills'); this.stat('k_' + e.type); if (e.type === 'guard' || e.elite) this.stat('eliteKills');
     if (e.elite) { this.banner('ЭЛИТА ПОВЕРЖЕНА', '#ffd23d', 'НАГРАДА', '+15 осколков и предмет'); P.s.gems += 15; for (let i = 0; i < 14; i++) this.dropCoin(e.x, e.y, 3); R.loot.push(P.rollItem(0.4 + this.cs.luck, 2)); this.pick.push({ k: 'heal', x: e.x, y: e.y, t: 0 }); this.shake(10); this.burst(e.x, e.y, '#ffd23d', 60, 420); this.vfx.push({ k: 'ring', x: e.x, y: e.y, r: 160, t: 0, d: 0.6, col: '#ffd23d' }); }
     if (this.ms) this.ms.kills = (this.ms.kills || 0) + 1;
+    Relic.onKill(this, e); if (e.elite) Relic.drop(this, e.x, e.y);
     R.comboT > 0 ? R.combo++ : (R.combo = 1); R.comboT = this.cs.combo; R.maxCombo = Math.max(R.maxCombo, R.combo);
     P.statMax('maxCombo', R.combo); if (R.combo > P.s.daily.maxCombo) P.s.daily.maxCombo = R.combo;
     const cm = 1 + Math.min(R.combo, 50) * 0.02;
@@ -671,6 +675,7 @@ const G = {
     this.banner('БОСС ПОВЕРЖЕН', b.col, b.n);
     this.portalOpen = true; this.lv.portal = { x: b.x, y: b.y };
     for (let i = 0; i < 25; i++) this.dropCoin(b.x, b.y, 3);
+    Relic.drop(this, b.x - 40, b.y + 40); Relic.drop(this, b.x + 40, b.y + 40);
     if (!this.rules.noHeal) this.pick.push({ k: 'heal', x: b.x + 40, y: b.y });
   },
   damageWall(tx, ty, dmg) { const k = tx + ',' + ty; const tv = this.lv.t[ty * this.lv.W + tx]; this.crack[k] = (this.crack[k] || (tv === 3 ? 28 : tv === 6 ? 15 : 70 + this.diff * 4)) - dmg; this.burst((tx + 0.5) * TS, (ty + 0.5) * TS, '#fff', 3, 120); if (this.crack[k] <= 0) this.breakWall(tx, ty); },
@@ -685,6 +690,7 @@ const G = {
     if (Math.random() < this.cs.dodge) { this.floatText(p.x, p.y - 26, 'УКЛОН', '#3dffa0'); p.inv = 0.3; return; }
     dmg *= (1 - this.cs.armor) * (this.ev.overload ? 1.25 : 1);
     if (src && this.cs.fx.has('thorns')) this.hurtEnemy(src, dmg * 0.6 + this.cs.dmg * 0.3, { noFx: true });
+    dmg = Relic.onHurt(this, dmg);
     if (p.shield > 0) { const a = Math.min(p.shield, dmg); p.shield -= a; dmg -= a; }
     p.hp -= dmg; p.inv = 0.45; this.secDmg += dmg; this.run.dmgTaken += dmg;
     this.floatText(p.x, p.y - 26, '-' + Math.round(dmg), '#ff3d55', 1.1);
@@ -723,7 +729,7 @@ const G = {
       if (p.superDash && this.boss && !p.sdHit.has(this.boss) && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < this.boss.r + p.r + 14) { p.sdHit.add(this.boss); this.hurtBoss(p.superDash); }
       if (p.dashT <= 0) p.superDash = 0;
     } else { const bs = (p.boostT > 0 ? 1.7 : 1) * (this.featSlow || 1) * (p.chill > 0 ? 0.6 : 1); let vx = m.x * cs.spd * bs, vy = m.y * cs.spd * bs; if (this.onIce) { const k = Math.min(1, dt * 2.2); p.ivx = (p.ivx || 0) + (vx - (p.ivx || 0)) * k; p.ivy = (p.ivy || 0) + (vy - (p.ivy || 0)) * k; vx = p.ivx; vy = p.ivy; if ((Math.abs(vx) > 40 || Math.abs(vy) > 40) && this.frame % 3 === 0) this.trailP(p.x, p.y, '#cfefff'); } else { p.ivx = vx; p.ivy = vy; } p.x += vx * dt; p.y += vy * dt; if (p.boostT > 0 && this.frame % 2 === 0) this.trailP(p.x, p.y, '#00f0ff'); }
-    p.chill = (p.chill || 0) - dt; this.updFeats(dt);
+    p.chill = (p.chill || 0) - dt; this.updFeats(dt); Relic.tick(this, dt); if (this.relCard) { this.relCard.t += dt; if (this.relCard.t > 3.2) this.relCard = null; }
     this.updateTiles(dt); if (this.frame % 6 === 0) this.updateRooms(dt * 6);
     if (m.x || m.y) { p.still = 0; if (!this.mouse.down) p.ang = Math.atan2(m.y, m.x); } else { p.still += dt; if (p.still > 30 && !p.afk) { p.afk = true; this.stat('afk'); } }
     this.collide(p);
@@ -731,7 +737,7 @@ const G = {
     this.fireCd = (this.fireCd || 0) - dt;
     // таймеры
     p.inv -= dt; p.dashCd -= dt;
-    if (p.ammo < cs.ammo) { p.ammoT += dt / cs.reload * (this.ev.overload ? 1.6 : 1); if (p.ammoT >= 1) { p.ammoT = 0; p.ammo++; } } else p.ammoT = 0;
+    if (p.ammo < cs.ammo) { p.ammoT += dt / cs.reload * (this.ev.overload ? 1.6 : 1) * Relic.reloadMul(this); if (p.ammoT >= 1) { p.ammoT = 0; p.ammo++; } } else p.ammoT = 0;
     if (!this.rules.noHeal && cs.regen > 0) p.hp = Math.min(p.maxHp, p.hp + cs.regen * dt);
     if (!this.rules.noHeal && this.secTime > 3 && performance.now() - (this.lastHurt || 0) > 4000 && p.hp < p.maxHp) { }
     if (cs.fx.has('supgen')) p.sup = Math.min(1, p.sup + dt * 0.03);
@@ -848,12 +854,13 @@ const G = {
       else if (fx === 'ring') this.vfx.push({ k: 'ring', x: k.x, y: k.y, r: 60, t: 0, d: 0.35, col: '#00f0ff' });
       else if (fx === 'stars') { for (let i = 0; i < 10; i++) this.texts.push({ x: k.x + (Math.random() - 0.5) * 50, y: k.y + (Math.random() - 0.5) * 30, s: '✦', col: '#ffd700', t: 0, sc: 1 }); }
       else this.burst(k.x, k.y, '#00f0ff', 10, 160);
-    } else if (k.k === 'coin') { R.coins += k.v; SFX.play('coin'); if (fx !== 'flash') this.burst(k.x, k.y, '#ffd23d', 3, 80); }
+    } else if (k.k === 'relic') { Relic.gain(this, k.id); } else if (k.k === 'pow') { Relic.pow(this, k.id); } else if (k.k === 'coin') { R.coins += Math.round(k.v * Relic.coinMul(this)); SFX.play('coin'); if (fx !== 'flash') this.burst(k.x, k.y, '#ffd23d', 3, 80); }
     else if (k.k === 'heal') { const h = p.maxHp * 0.25 * this.cs.healb; p.hp = Math.min(p.maxHp, p.hp + h); this.floatText(p.x, p.y - 30, '+' + Math.round(h), '#3dffa0', 1.2); SFX.play('core'); }
   },
   openChest(c) {
     c.open = true; this.stat('chests'); SFX.play('open'); this.burst(c.x, c.y, '#ffd700', 30, 300);
-    const n = c.big ? 14 : 6; for (let i = 0; i < n; i++) this.dropCoin(c.x, c.y, c.big ? 3 : 2);
+    const n = (c.big ? 14 : 6) * (Relic.has(this, 'greed') ? 2 : 1); for (let i = 0; i < n; i++) this.dropCoin(c.x, c.y, c.big ? 3 : 2);
+    if (Math.random() < (c.secret ? 0.9 : c.big ? 0.5 : 0.2) + this.cs.luck * 0.2) Relic.drop(this, c.x, c.y + 26); else if (Math.random() < 0.5) Relic.dropPow(this, c.x, c.y + 26);
     if (c.bonus) this.stat('bonusRooms');
     const ch = c.secret ? 0.7 : c.big ? 0.45 : 0.15;
     if (Math.random() < ch + this.cs.luck * 0.3) { const id = P.rollItem(this.cs.luck + (c.secret ? 0.4 : 0), c.secret ? 1 : 0); this.run.loot.push(id); this.floatText(c.x, c.y - 30, D.ITEMS[id].n, D.RAR[D.ITEMS[id].r].c, 1.3); }
@@ -1237,6 +1244,18 @@ const G = {
     if (tg) { const pq = this.proj(tg.x, tg.y), sx = pq.x, sy = pq.y; if (sx < 20 || sy < 20 || sx > W - 20 || sy > H - 20) { const a = Math.atan2(sy - H / 2, sx - W / 2), rx = W / 2 - 40, ry = H / 2 - 60, t = Math.min(Math.abs(rx / Math.cos(a)), Math.abs(ry / Math.sin(a))); c.save(); c.translate(W / 2 + Math.cos(a) * t, H / 2 + Math.sin(a) * t); c.rotate(a); c.fillStyle = this.portalOpen ? '#3dffa0' : '#00f0ff'; c.globalAlpha = 0.6 + Math.sin(T * 6) * 0.3; c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-4, 0); c.lineTo(-8, 10); c.closePath(); c.fill(); c.restore(); } }
     // баннер
     if (this.bn) { const b = this.bn; b.t += 1 / 60; const f = b.t < 0.25 ? b.t / 0.25 : b.t > 2.2 ? Math.max(0, 1 - (b.t - 2.2) / 0.4) : 1; if (b.t > 2.6) this.bn = null; else { c.globalAlpha = f; c.textAlign = 'center'; const y = H * 0.3; if (b.sub) { c.font = 'bold 11px Unbounded,sans-serif'; c.fillStyle = '#aab'; c.fillText(b.sub, W / 2, y - 26); } c.font = '900 ' + Math.min(34, W / 12) + 'px Unbounded,sans-serif'; c.fillStyle = b.col; this.glow(c, b.col, 20); c.fillText(b.s, W / 2 + (1 - f) * 40, y); this.glow(c, 0, 0); if (b.d2) { c.font = '12px Manrope,sans-serif'; c.fillStyle = '#dde'; c.fillText(b.d2, W / 2, y + 28); } c.globalAlpha = 1; } }
+    // реликвии и бонусы
+    { const rel = [...R.rel], ms2 = Math.min(110, W * 0.26), sz = 24, per = Math.max(1, Math.floor((ms2 + 8) / (sz + 4))); let ry = (this.ev.lost || this.rules.noMap || this.lv.arena) ? safe + 44 : safe + 44 + ms2 + 14;
+      rel.forEach((id, i) => { const r = D.RELM[id], col = D.RRAR[r.r][1], x = W - safe - (i % per + 1) * (sz + 4) + 4, y = ry + Math.floor(i / per) * (sz + 4); c.fillStyle = 'rgba(5,5,15,0.8)'; this.rr(c, x, y, sz, sz, 6); c.fill(); c.strokeStyle = col; c.lineWidth = 1.5; this.rr(c, x, y, sz, sz, 6); c.stroke(); c.fillStyle = col; c.font = '13px sans-serif'; c.textAlign = 'center'; c.fillText(r.ic, x + sz / 2, y + sz / 2 + 1); });
+      if (R.syn.size) { c.font = 'bold 8px Unbounded,sans-serif'; c.fillStyle = '#ff3dc8'; c.textAlign = 'right'; c.fillText('СИНЕРГИИ: ' + R.syn.size, W - safe, ry + Math.ceil(rel.length / per) * (sz + 4) + 8); }
+      const pw = Object.keys(this.pows).filter(k => this.pows[k] > 0 && k !== 'heal'); let px0 = W / 2 - pw.length * 22, py0 = (this.boss ? 52 : 0) + (R.combo >= 3 ? 70 : 46);
+      pw.forEach((k, i) => { const P0 = D.POWS[k], f = this.pows[k] / P0.d, x = px0 + i * 44 + 22, y = py0; c.fillStyle = 'rgba(5,5,15,0.8)'; c.beginPath(); c.arc(x, y, 17, 0, 6.28); c.fill(); c.strokeStyle = P0.col; c.lineWidth = 3; c.beginPath(); c.arc(x, y, 15, -Math.PI / 2, -Math.PI / 2 + f * 6.28); c.stroke(); c.fillStyle = P0.col; c.font = '14px sans-serif'; c.textAlign = 'center'; c.fillText(P0.ic, x, y + 1); if (f < 0.25 && Math.floor(T * 8) % 2) { c.globalAlpha = 0.4; c.beginPath(); c.arc(x, y, 17, 0, 6.28); c.fill(); c.globalAlpha = 1; } });
+      const RC = this.relCard; if (RC) { const r = D.RELM[RC.id], col = D.RRAR[r.r][1], t = RC.t, a = t < 0.3 ? t / 0.3 : t > 2.7 ? Math.max(0, (3.2 - t) / 0.5) : 1, sc = t < 0.3 ? 0.6 + 0.4 * (t / 0.3) + Math.sin(t / 0.3 * Math.PI) * 0.12 : 1, cw = Math.min(300, W - 40), ch = 132, cx = W / 2, cy = H * 0.62;
+        c.save(); c.globalAlpha = a; c.translate(cx, cy); c.scale(sc, sc); this.glow(c, col, 30); c.fillStyle = 'rgba(8,6,20,0.94)'; this.rr(c, -cw / 2, -ch / 2, cw, ch, 14); c.fill(); this.glow(c, 0, 0); c.strokeStyle = col; c.lineWidth = 2; this.rr(c, -cw / 2, -ch / 2, cw, ch, 14); c.stroke();
+        c.save(); c.beginPath(); this.rr(c, -cw / 2, -ch / 2, cw, ch, 14); c.clip(); const sx = ((t * 1.2) % 1.6 - 0.3) * cw * 1.4 - cw / 2; const gr = c.createLinearGradient(sx - 40, 0, sx + 40, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(-cw / 2, -ch / 2, cw, ch); c.restore();
+        c.textAlign = 'center'; c.font = 'bold 9px Unbounded,sans-serif'; c.fillStyle = col; c.fillText('НОВАЯ РЕЛИКВИЯ • ' + D.RRAR[r.r][0].toUpperCase(), 0, -ch / 2 + 18);
+        c.font = '34px sans-serif'; this.glow(c, col, 20); c.fillStyle = col; c.fillText(r.ic, 0, -14); this.glow(c, 0, 0);
+        c.font = '900 15px Unbounded,sans-serif'; c.fillStyle = '#fff'; c.fillText(r.n, 0, 22); c.font = '11px Manrope,sans-serif'; c.fillStyle = '#c9c6e6'; c.fillText(r.d, 0, 42); c.restore(); } }
     if (this.intro) { const I = this.intro, f = Math.min(1, I.t / 0.4), o = I.t > I.d - 0.5 ? Math.max(0, (I.d - I.t) / 0.5) : 1, bh = H * 0.13 * f * o;
       c.fillStyle = '#000'; c.fillRect(0, 0, W, bh); c.fillRect(0, H - bh, W, bh);
       if (I.t > 0.5) { const a = Math.min(1, (I.t - 0.5) / 0.4) * o, sl = (1 - Math.min(1, (I.t - 0.5) / 0.4)) * 80; c.globalAlpha = a; c.textAlign = 'center';
