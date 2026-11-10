@@ -110,6 +110,18 @@ const LevelGen = {
       for (let y = q.y; y < q.y + q.h; y++) for (const x of [q.x - 1, q.x + q.w]) if (get(x, y) === 0) q.doors.push([x, y]);
     }
     const biome = o.biome || D.BIOMES[Math.floor(r() * D.BIOMES.length)];
+    // особые механики биома
+    const feats = [];
+    const okRect = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (get(x, y) !== 0) return false; return true; };
+    rooms.forEach(q => {
+      if (q.type === 'start' || q.lock) return;
+      const cx = Math.floor(q.cx), cy = Math.floor(q.cy);
+      if (biome.id === 'factory' && r() < 0.75) { const hz = r() < 0.5, L = hz ? q.w - 2 : q.h - 2; if (L >= 4) { const x0 = hz ? q.x + 1 : cx, y0 = hz ? cy : q.y + 1, w = hz ? L : 2, h = hz ? 2 : L; if (okRect(x0, y0, w, h)) feats.push({ k: 'belt', x: x0 * TS, y: y0 * TS, w: w * TS, h: h * TS, dx: hz ? (r() < 0.5 ? 1 : -1) : 0, dy: hz ? 0 : (r() < 0.5 ? 1 : -1) }); } if (r() < 0.6) { const p = tileIn(q, 1); if (p) feats.push({ k: 'steam', x: (p[0] + 0.5) * TS, y: (p[1] + 0.5) * TS, r: 46, t: r() * 4, per: 3.5 }); } }
+      if (biome.id === 'lab' && r() < 0.7) for (let i = 0; i < ri(1, 2); i++) { const p = tileIn(q, 1); if (p) feats.push({ k: 'acid', x: (p[0] + 0.5) * TS, y: (p[1] + 0.5) * TS, r: 40 + r() * 30 }); }
+      if (biome.id === 'city' && r() < 0.6 && q.w >= 7) { const y = q.y + 1 + Math.floor(r() * (q.h - 2)); let clear = true; for (let x = q.x; x < q.x + q.w; x++) if (get(x, y) !== 0) clear = false; if (clear) feats.push({ k: 'car', y: (y + 0.5) * TS, x1: q.x * TS, x2: (q.x + q.w) * TS, sp: (160 + r() * 120) * (r() < 0.5 ? 1 : -1), t: r(), col: ['#ff3dc8', '#00f0ff', '#ffd23d'][ri(0, 2)] }); }
+      if (biome.id === 'frost' && r() < 0.8) { const w = Math.min(q.w - 2, ri(3, 6)), h = Math.min(q.h - 2, ri(3, 5)), x0 = q.x + 1 + Math.floor(r() * Math.max(1, q.w - 2 - w)), y0 = q.y + 1 + Math.floor(r() * Math.max(1, q.h - 2 - h)); if (w >= 2 && h >= 2) feats.push({ k: 'ice', x: x0 * TS, y: y0 * TS, w: w * TS, h: h * TS }); }
+      if (biome.id === 'station' && r() < 0.45) { const p = tileIn(q, 1); if (p) feats.push({ k: 'vac', x: (p[0] + 0.5) * TS, y: (p[1] + 0.5) * TS, t: r() * 6, per: 7 }); }
+    });
     const need = Math.max(1, Math.min(7, 3 + Math.floor(diff / 4)) + (o.coreMod || 0));
     const cores = [], coreRooms = rooms.filter(q => q.type !== 'start');
     for (let i = 0; i < need + 1; i++) cores.push(pick(coreRooms[i % coreRooms.length], 1.5));
@@ -142,17 +154,22 @@ const LevelGen = {
     for (let i = 0; i < (o.extraChests || 0) + (r() < 0.4 ? 1 : 0); i++) { const q = normals[ri(0, normals.length - 1)] || far; chests.push(pick(q, 1.5)); }
     rooms.forEach(q => { if (q.type !== 'start') { for (let i = 0; i < ri(1, 4); i++) coins.push(pick(q, 1)); if (r() < 0.3) heals.push(pick(q, 1.5)); } });
     return {
-      W, H, t, bush, rooms, secrets, biome, need, pads, tps, seed, terms, shrines,
+      W, H, t, bush, rooms, secrets, biome, need, pads, tps, seed, terms, shrines, feats,
       start: { x: start.cx * TS, y: start.cy * TS }, portal: { x: far.cx * TS, y: far.cy * TS }, portalRoom: far,
       cores, enemies, lasers, zones, chests, coins, heals, rnd: r
     };
   },
-  genArena(seed, biome) {
+  genArena(seed, biome, lay) {
     const r = rng(seed), W = 26, H = 26, t = new Uint8Array(W * H).fill(1), bush = new Uint8Array(W * H);
     for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) t[y * W + x] = 0;
-    [[6, 6], [18, 6], [6, 18], [18, 18]].forEach(([x, y]) => { t[y * W + x] = 5; t[y * W + x + 1] = 5; t[(y + 1) * W + x] = 5; t[(y + 1) * W + x + 1] = 5; });
-    [[3, 12], [21, 12]].forEach(([x, y]) => { for (let a = 0; a < 2; a++) for (let b = 0; b < 3; b++) bush[(y + b) * W + x + a] = 1; });
+    const set4 = (x, y, v) => { t[y * W + x] = v; t[y * W + x + 1] = v; t[(y + 1) * W + x] = v; t[(y + 1) * W + x + 1] = v; };
+    if (lay === 'ring') { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (Math.hypot(x + 0.5 - W / 2, y + 0.5 - H / 2) > 11.2) t[y * W + x] = 1; [[8, 12], [16, 12], [12, 8], [12, 16]].forEach(([x, y]) => set4(x, y, 5)); }
+    else if (lay === 'cross') { [[5, 5], [19, 5], [5, 19], [19, 19]].forEach(([x, y]) => set4(x, y, 1)); [[12, 6], [12, 18], [6, 12], [18, 12]].forEach(([x, y]) => set4(x, y, 3)); }
+    else if (lay === 'open') { [[7, 7], [17, 17]].forEach(([x, y]) => set4(x, y, 5)); [[17, 7], [7, 17]].forEach(([x, y]) => set4(x, y, 6)); }
+    else if (lay === 'maze') { for (let i = 0; i < 4; i++) { const x = 6 + i * 4; for (let y = 5; y < 10; y++) if (i % 2) t[y * W + x] = 2; for (let y = 16; y < 21; y++) if (!(i % 2)) t[y * W + x] = 2; } }
+    else [[6, 6], [18, 6], [6, 18], [18, 18]].forEach(([x, y]) => set4(x, y, 5));
+    if (lay !== 'ring') [[3, 12], [21, 12]].forEach(([x, y]) => { for (let a = 0; a < 2; a++) for (let b = 0; b < 3; b++) bush[(y + b) * W + x + a] = 1; });
     const room = { x: 2, y: 2, w: W - 4, h: H - 4, cx: W / 2, cy: H / 2, type: 'boss', style: 'arena' };
-    return { W, H, t, bush, rooms: [room], secrets: [], biome: biome || D.BIOMES[4], need: 0, pads: [], tps: [], terms: [], shrines: [], seed, start: { x: W / 2 * TS, y: (H - 4) * TS }, portal: { x: W / 2 * TS, y: H / 2 * TS }, portalRoom: room, cores: [], enemies: [], lasers: [], zones: [], chests: [], coins: [], heals: [{ x: 4 * TS, y: 4 * TS }, { x: (W - 4) * TS, y: (H - 4) * TS }], rnd: r, arena: true };
+    return { W, H, t, bush, rooms: [room], secrets: [], biome: biome || D.BIOMES[4], need: 0, pads: [], tps: [], terms: [], shrines: [], feats: [], seed, start: { x: W / 2 * TS, y: (H - 4) * TS }, portal: { x: W / 2 * TS, y: H / 2 * TS }, portalRoom: room, cores: [], enemies: [], lasers: [], zones: [], chests: [], coins: [], heals: [{ x: 4 * TS, y: 4 * TS }, { x: (W - 4) * TS, y: (H - 4) * TS }], rnd: r, arena: true };
   }
 };

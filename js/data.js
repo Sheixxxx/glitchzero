@@ -145,7 +145,10 @@ const IT = [
   ['oc_heart', 'Сердце Оверклока', 'relic', 5, '♥', { rate: 22, spd: 12 }, 'overclock', 'boss'],
   ['eye_lens', 'Линза Пустоты', 'relic', 5, '◉', { range: 25, crit: 15, critd: 50 }, 'pierce', 'boss'],
   ['zero_key', 'Ключ ZERO', 'relic', 5, '⚿', { dmg: 25, hp: 30, sup: 25 }, 'chrono', 'boss'],
-  ['null_shard', 'Осколок NULL', 'relic', 5, '∅', { dmg: 30, rate: 20, luck: 30 }, 'multi', 'boss']
+  ['null_shard', 'Осколок NULL', 'relic', 5, '∅', { dmg: 30, rate: 20, luck: 30 }, 'multi', 'boss'],
+  ['crush_gear', 'Шестерня Дробителя', 'relic', 5, '⚙', { hp: 50, dmg: 15, armor: 8 }, 'boom', 'boss'],
+  ['cryo_heart', 'Сердце Криоматки', 'relic', 5, '❄', { crit: 15, rate: 15, shield: 25 }, 'freeze', 'boss'],
+  ['hive_chip', 'Чип Улья', 'relic', 5, '⬢', { dmg: 15, sup: 25, luck: 15 }, 'chain', 'boss']
 ];
 D.ITEMS = {};
 D.ITEM_LIST = IT.map(a => {
@@ -216,12 +219,15 @@ D.MODS = [
 
 /* ===== Боссы ===== */
 D.BOSSES = [
-  { id: 'firewall', n: 'ФАЕРВОЛ', d: 'Неприступная стена защиты. Кольца пуль и вращающиеся лазеры.', hp: 2600, col: '#ff3d55', r: 46, relic: 'fw_core' },
-  { id: 'serpent', n: 'ПОЖИРАТЕЛЬ', d: 'Гигантский червь-вирус. Оставляет мины и плюётся кодом.', hp: 3000, col: '#3dffa0', r: 30, relic: 'serp_fang' },
-  { id: 'overclock', n: 'ОВЕРКЛОК', d: 'Перегретый процессор. Таранит, стреляет, создаёт клонов.', hp: 3300, col: '#ffb020', r: 34, relic: 'oc_heart' },
-  { id: 'eye', n: 'ГЛАЗ ПУСТОТЫ', d: 'Видит всё. Снайперские лучи и аномалии.', hp: 3600, col: '#b44dff', r: 40, relic: 'eye_lens' },
-  { id: 'zero', n: 'ЯДРО ZERO', d: 'Сердце системы. Владеет всеми атаками.', hp: 5200, col: '#00f0ff', r: 50, relic: 'zero_key' },
-  { id: 'null', n: 'NULL', d: '???', hp: 7000, col: '#ffffff', r: 38, relic: 'null_shard', secret: true }
+  { id: 'firewall', n: 'ФАЕРВОЛ', d: 'Неприступная стена защиты. Кольца пуль и вращающиеся лазеры.', hp: 2600, col: '#ff3d55', r: 46, relic: 'fw_core', arena: 'pillars', biome: 'core', t: 'Защита системы активирована' },
+  { id: 'serpent', n: 'ПОЖИРАТЕЛЬ', d: 'Гигантский червь-вирус. Оставляет мины и плюётся кодом.', hp: 3000, col: '#3dffa0', r: 30, relic: 'serp_fang', arena: 'open', biome: 'circuit', t: 'Что-то движется под полом' },
+  { id: 'overclock', n: 'ОВЕРКЛОК', d: 'Перегретый процессор. Таранит, стреляет, создаёт клонов.', hp: 3300, col: '#ffb020', r: 34, relic: 'oc_heart', arena: 'maze', biome: 'factory', t: 'Перегрев 999%' },
+  { id: 'eye', n: 'ГЛАЗ ПУСТОТЫ', d: 'Видит всё. Снайперские лучи и аномалии.', hp: 3600, col: '#b44dff', r: 40, relic: 'eye_lens', arena: 'ring', biome: 'void', t: 'Оно смотрит на тебя' },
+  { id: 'zero', n: 'ЯДРО ZERO', d: 'Сердце системы. Владеет всеми атаками.', hp: 5200, col: '#00f0ff', r: 50, relic: 'zero_key', arena: 'cross', biome: 'grid', t: 'Ядро системы' },
+  { id: 'crusher', n: 'ДРОБИТЕЛЬ', d: 'Промышленный пресс-гигант. Топчет, бросает поршни и включает конвейеры.', hp: 3800, col: '#ff9a1a', r: 44, relic: 'crush_gear', arena: 'cross', biome: 'factory', t: 'Фабрика проснулась' },
+  { id: 'cryo', n: 'КРИОМАТКА', d: 'Королева льда. Ледяные шипы, буран и ледяные клоны.', hp: 4000, col: '#9fe8ff', r: 38, relic: 'cryo_heart', arena: 'ring', biome: 'frost', t: 'Температура падает' },
+  { id: 'hive', n: 'УЛЕЙ', d: 'Матка дронов. Щит из роя, бомбардировки и рой-лазер.', hp: 4200, col: '#6aa8ff', r: 42, relic: 'hive_chip', arena: 'open', biome: 'station', t: 'Обнаружен рой' },
+  { id: 'null', n: 'NULL', d: '???', hp: 7000, col: '#ffffff', r: 38, relic: 'null_shard', secret: true, arena: 'maze', biome: 'void', t: '0x00000000' }
 ];
 D.BOSSM = {}; D.BOSSES.forEach(b => D.BOSSM[b.id] = b);
 

@@ -284,6 +284,35 @@ const R3 = {
     else if (b.id === 'serpent') { add(new T3.SphereGeometry(r, 18, 14), m, r); const ey = this.eye(r * 0.3); ey.position.set(r * 0.6, r * 1.3, r * 0.4); g.add(ey); const ey2 = this.eye(r * 0.3); ey2.position.set(r * 0.6, r * 1.3, -r * 0.4); g.add(ey2); }
     else if (b.id === 'overclock') { g.userData.a = add(new T3.TorusGeometry(r * 0.8, r * 0.28, 10, 30), m, r); g.userData.a.rotation.x = Math.PI / 2; for (let i = 0; i < 8; i++) { const t = new T3.Mesh(new T3.BoxGeometry(r * 0.4, r * 0.3, r * 0.3), gl); const a = i / 8 * 6.28; t.position.set(Math.cos(a) * r * 1.15, 0, Math.sin(a) * r * 1.15); t.rotation.y = -a; g.userData.a.add(t); t.rotation.x = Math.PI / 2; } add(new T3.SphereGeometry(r * 0.45, 14, 10), gl, r); }
     else if (b.id === 'eye') { add(new T3.SphereGeometry(r, 24, 18), this.M('#e8e0ff', { e: 0.35, dark: 0.8 }), r * 1.4); const iris = add(new T3.SphereGeometry(r * 0.45, 16, 12), gl, r * 1.4); const pu = add(new T3.SphereGeometry(r * 0.22, 12, 10), new T3.MeshBasicMaterial({ color: 0 }), r * 1.4); g.userData.iris = iris; g.userData.pu = pu; g.userData.ring = add(new T3.TorusGeometry(r * 1.4, 0.05, 8, 50), gl, r * 1.4); }
+    else if (b.id === 'crusher') {
+      const st = this.S('#a89480', 0.6, 0.35, 0.18), hz = this.S('#ff9a1a', 0.4, 0.4, 0.45), dk = this.S('#3a3228', 0.6, 0.5, 0.08);
+      const body = new T3.Group(); g.add(body); g.userData.body = body;
+      const A = (geo, m, x, y, z) => { const o = new T3.Mesh(geo, m); o.position.set(x, y, z); body.add(o); return o; };
+      A(this.RB(r * 2.2, r * 0.5, r * 2.2), dk, 0, r * 0.25, 0); A(this.RB(r * 1.8, r * 1.2, r * 1.8), st, 0, r * 1.1, 0);
+      for (let i = 0; i < 6; i++) A(this.RB(r * 0.25, r * 0.1, r * 1.85), i % 2 ? hz : dk, -r * 0.65 + i * r * 0.26, r * 1.72, 0);
+      g.userData.press = A(this.RB(r * 2.4, r * 0.4, r * 2.4), st, 0, r * 2.6, 0); for (const s of [-1, 1]) for (const f of [-1, 1]) A(new T3.CylinderGeometry(r * 0.12, r * 0.12, r * 1.6, 12), this.S('#aaa', 0.95, 0.2, 0.02), s * r * 0.95, r * 2.0, f * r * 0.95);
+      for (const s of [-1, 1]) { const gr = A(new T3.CylinderGeometry(r * 0.55, r * 0.55, r * 0.2, 12), hz, 0, r * 1.1, s * r * 1.0); gr.rotation.x = Math.PI / 2; g.userData.gears = (g.userData.gears || []).concat([gr]); }
+      A(this.RB(r * 0.5, r * 0.3, r * 1.2), this.M('#ff3d20', { basic: 1 }), r * 0.92, r * 1.3, 0);
+      for (let i = 0; i < 3; i++) A(new T3.CylinderGeometry(r * 0.12, r * 0.15, r * 0.9, 10), dk, -r * 0.6, r * 2.9 + i * 0, -r * 0.6 + i * r * 0.6);
+    }
+    else if (b.id === 'cryo') {
+      const ice = this.S('#cfefff', 0.2, 0.1, 0.35); ice.transparent = true; ice.opacity = 0.9; const dk = this.S('#1a2a3a', 0.6, 0.3, 0.05);
+      const pts = []; for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push(new T3.Vector2(r * (0.3 + t * t * 0.9), r * 2.4 - t * r * 2.4)); }
+      add(new T3.LatheGeometry(pts, 8), ice, 0); add(new T3.SphereGeometry(r * 0.38, 16, 12), dk, r * 2.6);
+      add(new T3.SphereGeometry(r * 0.4, 16, 6, 0, 6.28, 1.2, 0.5), this.M('#9fe8ff', { basic: 1 }), r * 2.6);
+      g.userData.crown = new T3.Group(); g.userData.crown.position.y = r * 3.0; g.add(g.userData.crown);
+      for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28, c = new T3.Mesh(new T3.ConeGeometry(r * 0.08, r * (0.4 + (i % 2) * 0.35), 5), ice); c.position.set(Math.cos(a) * r * 0.35, r * 0.2, Math.sin(a) * r * 0.35); g.userData.crown.add(c); }
+      g.userData.a = new T3.Group(); g.userData.a.position.y = r * 1.4; g.add(g.userData.a);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28, s = new T3.Mesh(new T3.OctahedronGeometry(r * 0.18, 0), ice); s.scale.set(0.5, 1.8, 0.5); s.position.set(Math.cos(a) * r * 1.5, Math.sin(i) * r * 0.3, Math.sin(a) * r * 1.5); g.userData.a.add(s); }
+    }
+    else if (b.id === 'hive') {
+      const sh = this.S('#2a3450', 0.8, 0.3, 0.08), gl = this.M(col, { basic: 1 });
+      add(new T3.SphereGeometry(r, 24, 16, 0, 6.28, 0, 1.9), sh, r * 1.3).scale.set(1, 0.7, 1);
+      for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28, c = add(new T3.CylinderGeometry(r * 0.12, r * 0.16, r * 0.25, 6), sh, r * 1.0); c.position.x = Math.cos(a) * r * 0.85; c.position.z = Math.sin(a) * r * 0.85; c.rotation.z = Math.cos(a) * 0.9; c.rotation.x = -Math.sin(a) * 0.9; const l = add(new T3.CircleGeometry(r * 0.1, 6), gl, r * 1.0); l.position.copy(c.position); l.position.y += r * 0.12; l.rotation.x = -Math.PI / 2; }
+      const eye = add(new T3.SphereGeometry(r * 0.35, 16, 12), gl, r * 1.95); g.userData.iris = null;
+      g.userData.b = add(new T3.TorusGeometry(r * 1.3, 0.05, 8, 60), gl, r * 1.0); g.userData.b.rotation.x = Math.PI / 2;
+      for (let i = 0; i < 4; i++) { const a = i / 4 * 6.28, l = add(new T3.CylinderGeometry(0.06, 0.04, r * 1.3, 6), sh, r * 0.4); l.position.x = Math.cos(a) * r * 0.9; l.position.z = Math.sin(a) * r * 0.9; l.rotation.z = Math.cos(a) * 0.5; l.rotation.x = -Math.sin(a) * 0.5; }
+    }
     else { g.userData.a = add(new T3.OctahedronGeometry(r), b.id === 'null' ? new T3.MeshBasicMaterial({ color: 0xffffff, wireframe: true }) : m, r * 1.3); g.userData.b = add(new T3.TorusGeometry(r * 1.3, 0.06, 8, 50), gl, r * 1.3); g.userData.c = add(new T3.TorusGeometry(r * 1.6, 0.04, 8, 50), gl, r * 1.3); g.userData.c.rotation.x = Math.PI / 2; }
     const sh = new T3.Mesh(this.discGeo, new T3.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0.5, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.scale.set(r * 1.2, r * 1.2, 1); sh.position.y = 0.012; g.add(sh);
     return g;
@@ -358,6 +387,7 @@ const R3 = {
     this.lamps = decL;
     IM(new T3.BoxGeometry(0.9, 0.02, 0.9), new T3.MeshLambertMaterial({ color: 0x0a0a18, emissive: this.C(pal.edge), emissiveIntensity: 0.18 }), decF, ([x, y]) => { d.position.set(x + 0.5, 0.012, y + 0.5); d.rotation.set(0, 0, 0); d.scale.set(1, 1, 1); });
     IM(new T3.CylinderGeometry(0.035, 0.035, 0.9, 6), new T3.MeshLambertMaterial({ color: 0x111122, emissive: this.C(pal.edge), emissiveIntensity: 0.15 }), decC, ([x, y, h]) => { d.position.set(x + 0.5, 0.04, y + 0.5); d.rotation.set(0, 0, Math.PI / 2); d.rotation.y = (h % 2) * Math.PI / 2; d.scale.set(1, 1, 1); });
+    this.biomeDeco(lv, grp, at, open, WH);
     // терминалы взлома
     this.termG = (lv.terms || []).map(tm => {
       const o = new T3.Group(); o.position.set(tm.x / TS, 0, tm.y / TS); grp.add(o);
@@ -404,6 +434,54 @@ const R3 = {
     this.dummy.position.set(0, -50, 0); this.dummy.scale.set(0.001, 0.001, 0.001); this.dummy.updateMatrix(); m.setMatrixAt(ti[1], this.dummy.matrix); m.instanceMatrix.needsUpdate = true;
     delete this.tileInst[i]; if (ti[0] === 'w') this.buildEdges();
     if (this.floorCv) { this.floorCv.getContext('2d').drawImage(G.mapCv, 0, 0, this.floorCv.width, this.floorCv.height); this.ftex.needsUpdate = true; }
+  },
+  /* ---------- уникальная архитектура биомов ---------- */
+  biomeDeco(lv, grp, at, open, WH) {
+    const T3 = THREE, id = lv.biome.id, d = this.dummy, hs = (x, y, k) => ((x * 2654435761) ^ (y * 40503) ^ (k * 97531)) >>> 0;
+    const edge = [], inner = [];
+    for (let y = 0; y < lv.H; y++) for (let x = 0; x < lv.W; x++) { if (at(x, y) !== 1) continue; const n = open(x - 1, y) || open(x + 1, y) || open(x, y - 1) || open(x, y + 1); (n ? edge : inner).push([x, y, hs(x, y, 7) % 1000, open(x, y + 1) ? 's' : open(x, y - 1) ? 'n' : open(x + 1, y) ? 'e' : 'w']); }
+    const IM = (geo, mat, list, fn) => { if (!list.length) return; const m = new T3.InstancedMesh(geo, mat, list.length); m.count = 0; list.forEach(a => { d.rotation.set(0, 0, 0); d.scale.set(1, 1, 1); fn(a); d.updateMatrix(); m.setMatrixAt(m.count++, d.matrix); }); m.instanceMatrix.needsUpdate = true; grp.add(m); return m; };
+    const off = (s, k) => s === 's' ? [0, k] : s === 'n' ? [0, -k] : s === 'e' ? [k, 0] : [-k, 0];
+    this.bfx = [];
+    if (id === 'factory') {
+      const pipes = edge.filter(a => a[2] < 350), chim = inner.filter(a => a[2] < 25);
+      IM(new T3.CylinderGeometry(0.11, 0.11, 1.02, 10), this.S('#8a7a6a', 0.85, 0.35, 0.03), pipes, ([x, y, h, s]) => { const [ox, oz] = off(s, 0.52); d.position.set(x + 0.5 + ox, 0.55 + (h % 3) * 0.2, y + 0.5 + oz); d.rotation.set(s === 'n' || s === 's' ? 0 : Math.PI / 2, 0, Math.PI / 2); });
+      IM(this.RB(0.5, 0.06, 1.04), this.S('#ff9a1a', 0.3, 0.5, 0.4), edge.filter(a => a[2] > 900), ([x, y]) => { d.position.set(x + 0.5, WH + 0.03, y + 0.5); });
+      IM(new T3.CylinderGeometry(0.3, 0.36, 2.6, 12), this.S('#4a3a2e', 0.6, 0.6, 0.02), chim, ([x, y]) => { d.position.set(x + 0.5, 1.3, y + 0.5); });
+      chim.forEach(([x, y]) => this.bfx.push(['smoke', x + 0.5, 2.7, y + 0.5]));
+      IM(this.RB(0.7, 0.5, 0.5), this.S('#6a5a40', 0.5, 0.6, 0.05), edge.filter(a => a[2] > 350 && a[2] < 420), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.7); d.position.set(x + 0.5 + ox, 0.25, y + 0.5 + oz); d.rotation.y = h % 3; });
+    } else if (id === 'lab') {
+      const tanks = edge.filter(a => a[2] < 90);
+      const gl = new T3.MeshStandardMaterial({ color: 0xbfffe8, metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.25 });
+      IM(new T3.CylinderGeometry(0.32, 0.32, 1.5, 18, 1, true), gl, tanks, ([x, y, h, s]) => { const [ox, oz] = off(s, 0.85); d.position.set(x + 0.5 + ox, 0.85, y + 0.5 + oz); });
+      IM(new T3.CylinderGeometry(0.28, 0.28, 1.1, 16), this.M('#3dffb0', { basic: 1, op: 0.55 }), tanks, ([x, y, h, s]) => { const [ox, oz] = off(s, 0.85); d.position.set(x + 0.5 + ox, 0.7, y + 0.5 + oz); });
+      IM(new T3.CylinderGeometry(0.36, 0.4, 0.14, 18), this.S('#ccd8d4', 0.6, 0.3, 0.05), tanks, ([x, y, h, s]) => { const [ox, oz] = off(s, 0.85); d.position.set(x + 0.5 + ox, 0.07, y + 0.5 + oz); });
+      tanks.forEach(([x, y, h, s]) => { const [ox, oz] = off(s, 0.85); this.bfx.push(['bub', x + 0.5 + ox, 0.2, y + 0.5 + oz]); });
+      IM(this.RB(1.04, 0.05, 0.1), this.M('#ffffff', { basic: 1 }), edge.filter(a => a[2] > 500), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.5); d.position.set(x + 0.5 + ox * 1.02, WH * 0.6, y + 0.5 + oz * 1.02); if (s === 'e' || s === 'w') d.rotation.y = Math.PI / 2; });
+    } else if (id === 'city') {
+      const tall = edge.filter(a => a[2] < 420 && a[3] === 's').concat(inner.filter(a => a[2] < 400 && !open(a[0], a[1] - 1) && !open(a[0], a[1] - 2)));
+      IM(new T3.BoxGeometry(1, 1, 1), this.S('#1a1028', 0.4, 0.6, 0.06), tall, ([x, y, h]) => { const H = 1.5 + (h % 5) * 0.7; d.position.set(x + 0.5, WH + H / 2, y + 0.5); d.scale.set(1, H, 1); });
+      const signs = edge.filter(a => a[2] < 420 && a[3] === 's' && a[2] % 3 === 0);
+      IM(new T3.PlaneGeometry(0.8, 0.45), this.M('#ff3dc8', { basic: 1, ds: 1 }), signs.filter(a => a[2] % 2), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.52); d.position.set(x + 0.5 + ox, WH + 0.8 + (h % 3) * 0.4, y + 0.5 + oz); d.rotation.y = s === 'e' ? Math.PI / 2 : s === 'w' ? -Math.PI / 2 : s === 'n' ? Math.PI : 0; });
+      IM(new T3.PlaneGeometry(0.45, 0.9), this.M('#00f0ff', { basic: 1, ds: 1 }), signs.filter(a => !(a[2] % 2)), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.52); d.position.set(x + 0.5 + ox, WH + 1 + (h % 3) * 0.4, y + 0.5 + oz); d.rotation.y = s === 'e' ? Math.PI / 2 : s === 'w' ? -Math.PI / 2 : s === 'n' ? Math.PI : 0; });
+      IM(new T3.BoxGeometry(0.06, 0.06, 0.06), this.M('#ffd23d', { basic: 1 }), tall.filter(a => a[2] % 2), ([x, y, h]) => { d.position.set(x + 0.5 + ((h % 7) - 3) * 0.1, WH + 1 + (h % 4) * 0.5, y + 1.01); d.scale.set(3, 1.5, 1); });
+    } else if (id === 'frost') {
+      IM(this.RB(1.02, 0.14, 1.02), this.S('#f4faff', 0.05, 0.7, 0.25), edge.concat(inner.filter(a => a[2] < 500)), ([x, y, h]) => { d.position.set(x + 0.5, WH + 0.06, y + 0.5); d.scale.set(1, 1 + (h % 3) * 0.4, 1); });
+      const ic = this.S('#bfe8ff', 0.1, 0.05, 0.4); ic.transparent = true; ic.opacity = 0.85;
+      IM(new T3.ConeGeometry(0.06, 0.45, 5), ic, edge.filter(a => a[2] < 500), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.53); d.position.set(x + 0.5 + ox + ((h % 5) - 2) * 0.15, WH - 0.25, y + 0.5 + oz); d.rotation.x = Math.PI; d.scale.set(1, 0.6 + (h % 4) * 0.25, 1); });
+      IM(new T3.OctahedronGeometry(0.3, 0), ic, edge.filter(a => a[2] > 930), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.7); d.position.set(x + 0.5 + ox, 0.35, y + 0.5 + oz); d.scale.set(0.6, 1.6, 0.6); d.rotation.z = (h % 5) * 0.15; });
+      this.bfx.push(['snow']);
+    } else if (id === 'station') {
+      const win = edge.filter(a => a[2] < 300);
+      IM(new T3.PlaneGeometry(0.75, 0.5), this.M('#05081a', { basic: 1, ds: 1 }), win, ([x, y, h, s]) => { const [ox, oz] = off(s, 0.505); d.position.set(x + 0.5 + ox, WH * 0.6, y + 0.5 + oz); d.rotation.y = s === 'e' ? Math.PI / 2 : s === 'w' ? -Math.PI / 2 : s === 'n' ? Math.PI : 0; });
+      IM(new T3.TorusGeometry(0.34, 0.04, 6, 4), this.S('#8aa0c8', 0.9, 0.25, 0.05), win, ([x, y, h, s]) => { const [ox, oz] = off(s, 0.51); d.position.set(x + 0.5 + ox, WH * 0.6, y + 0.5 + oz); d.rotation.set(0, s === 'e' || s === 'w' ? Math.PI / 2 : 0, Math.PI / 4); d.scale.set(1.5, 1, 1); });
+      win.forEach(([x, y, h, s]) => { const [ox, oz] = off(s, 0.51); for (let k = 0; k < 2; k++) this.bfx.push(['star', x + 0.5 + ox + ((hs(x, y, k) % 60) / 100 - 0.3) * (s === 'n' || s === 's' ? 1 : 0), WH * 0.6 + ((hs(x, y, k + 5) % 40) / 100 - 0.2), y + 0.5 + oz + ((hs(x, y, k) % 60) / 100 - 0.3) * (s === 'e' || s === 'w' ? 1 : 0)]); });
+      IM(this.RB(0.5, 0.4, 0.35), this.S('#3a4868', 0.7, 0.3, 0.1), edge.filter(a => a[2] > 300 && a[2] < 380), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.68); d.position.set(x + 0.5 + ox, 0.2, y + 0.5 + oz); });
+      edge.filter(a => a[2] > 300 && a[2] < 380).forEach(([x, y, h, s]) => { const [ox, oz] = off(s, 0.68); this.bfx.push(['con', x + 0.5 + ox, 0.45, y + 0.5 + oz]); });
+    } else if (id === 'crystal' || id === 'core' || id === 'void') {
+      const c = id === 'crystal' ? '#ff3dc8' : id === 'core' ? '#ff3d20' : '#3d7bff';
+      IM(new T3.OctahedronGeometry(0.25, 0), this.S(c, 0.2, 0.1, 0.7), edge.filter(a => a[2] < 120), ([x, y, h, s]) => { const [ox, oz] = off(s, 0.62); d.position.set(x + 0.5 + ox, 0.3, y + 0.5 + oz); d.scale.set(0.6, 1.5 + (h % 3) * 0.5, 0.6); d.rotation.z = ((h % 5) - 2) * 0.2; });
+    }
   },
   msModel(k) {
     const T3 = THREE, g = new T3.Group(), A = (geo, mat, x, y, z) => { const o = new T3.Mesh(geo, mat); o.position.set(x, y, z); g.add(o); return o; };
@@ -464,8 +542,8 @@ const R3 = {
     const p = G.p, lv = G.lv, px = p.x / TS, pz = p.y / TS, cs = G.cs;
     this.pn = 0; for (const pool of [this.lasPool, this.ringPool, this.planePool, this.boxPool]) pool.u = 0;
     // камера
-    const asp = innerWidth / innerHeight, D = Math.max(13 / asp, 10.5) * (G.lv.arena ? 1.3 : 1), el = 0.92;
-    this.ct = this.ct || { x: px, z: pz }; this.ct.x += (px - this.ct.x) * Math.min(1, dt * 7); this.ct.z += (pz - this.ct.z) * Math.min(1, dt * 7);
+    const asp = innerWidth / innerHeight; this.zoomK = (this.zoomK || 1) + (((G.intro && G.boss) ? 0.55 : 1) - (this.zoomK || 1)) * Math.min(1, dt * 2); const D = Math.max(13 / asp, 10.5) * (G.lv.arena ? 1.3 : 1) * this.zoomK, el = 0.92;
+    const foc = G.intro && G.boss, tx = foc ? G.boss.x / TS : px, tz = foc ? G.boss.y / TS + 1 : pz, ck = foc ? 2.5 : 7; this.ct = this.ct || { x: px, z: pz }; this.ct.x += (tx - this.ct.x) * Math.min(1, dt * ck); this.ct.z += (tz - this.ct.z) * Math.min(1, dt * ck);
     const sh = (G.shk || 0) / TS;
     this.cam.position.set(this.ct.x + (Math.random() - 0.5) * sh, Math.sin(el) * D, this.ct.z - 1.4 + Math.cos(el) * D + (Math.random() - 0.5) * sh);
     this.cam.lookAt(this.ct.x, 0, this.ct.z - 1.4);
@@ -510,6 +588,9 @@ const R3 = {
       bg.scale.setScalar(B.flash > 0 ? 1.08 : 1);
       if (u.a) u.a.rotation.y = T * (B.st === 2 ? 14 : 1); if (u.b) u.b.rotation.z = T * 1.5; if (u.c) u.c.rotation.y = -T * 2;
       if (B.id === 'serpent') bg.rotation.y = -B.a;
+      if (B.id === 'crusher') { const r = B.r / TS * 1.1; u.press.position.y = r * 2.6 - (B.squash || 0) * r * 1.2; (u.gears || []).forEach(q => q.rotation.y = T * 3); u.body.rotation.y = -Math.atan2(p.y - B.y, p.x - B.x); }
+      if (B.id === 'cryo') { u.crown.rotation.y = T; bg.position.y = 0.3 + Math.sin(T * 1.5) * 0.15; for (let k = 0; k < 3; k++) this.gp(bx + (Math.random() - 0.5) * 3, Math.random() * 2, bz + (Math.random() - 0.5) * 3, '#cfefff', 0.2, 0.8); }
+      if (B.id === 'hive') { bg.position.y = 0.4 + Math.sin(T * 2) * 0.2; if (B.armor < 1) this.ring(bx, bz, B.r / TS + 1.1, '#6aa8ff', 0.25, 1.2, true); }
       if (u.iris) { const pa = Math.atan2(p.y - B.y, p.x - B.x), r = B.r / TS * 1.1; u.iris.position.x = Math.cos(pa) * r * 0.65; u.iris.position.z = Math.sin(pa) * r * 0.65; u.pu.position.x = Math.cos(pa) * r * 0.95; u.pu.position.z = Math.sin(pa) * r * 0.95; u.ring.rotation.x = T; u.ring.rotation.y = T * 0.7; }
       this.gp(bx, 1, bz, B.col, 4, 0.45);
       if (B.segs.length) { while (this.segG.length < B.segs.length) { const s = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), this.M(B.col, { e: 0.4 })); this.lvG.add(s); this.segG.push(s); } B.segs.forEach((s, i) => { const o = this.segG[i], r = s.r / TS * 1.1; o.position.set(s.x / TS, r, s.y / TS); o.scale.setScalar(r); }); }
@@ -553,6 +634,31 @@ const R3 = {
     if (G.merchant) { const m = G.merchant; this.box(m.x / TS, 0.7 + Math.sin(T * 3) * 0.1, m.y / TS, 0.35, 0.35, 0.35, '#ffb020', m.used ? 0.2 : 0.9); this.gp(m.x / TS, 0.7, m.y / TS, '#ffb020', 2, m.used ? 0.1 : 0.5); }
     // объекты миссии
     this.drawMission(G, T, px, pz);
+    // механики биома
+    for (const f of lv.feats || []) {
+      if (f.k === 'belt') { const cx = (f.x + f.w / 2) / TS, cz = (f.y + f.h / 2) / TS; if (!vis(cx, cz, 8)) continue; const hz = f.dx !== 0, L = (hz ? f.w : f.h) / TS, Wd = (hz ? f.h : f.w) / TS, dir = f.dx || f.dy, sp = (G.beltMul || 1);
+        this.plane(cx, cz, Wd * 0.95, L, hz ? 0 : Math.PI / 2, '#ff9a1a', 0.12, 0.02);
+        const n = Math.floor(L / 0.8); for (let i = 0; i < n; i++) { const o = ((i * 0.8 + T * 1.6 * sp * dir) % L + L) % L - L / 2, x = hz ? cx + o : cx, z = hz ? cz : cz + o; this.plane(x, z, Wd * 0.7, 0.12, hz ? 0 : Math.PI / 2, '#ffb84a', 0.55, 0.03); }
+        for (const s of [-0.5, 0.5]) this.plane(hz ? cx : cx + s * Wd, hz ? cz + s * Wd : cz, 0.06, L, hz ? 0 : Math.PI / 2, '#ff9a1a', 0.8, 0.035); }
+      else if (f.k === 'steam') { const x = f.x / TS, z = f.y / TS; if (!vis(x, z)) continue; const r = f.r / TS; this.ring(x, z, r, f.on ? '#ffffff' : f.warn ? '#ffd23d' : '#666677', f.on ? 0.8 : 0.5); this.box(x, 0.06, z, 0.5, 0.12, 0.5, '#555566', 0.8); if (f.warn) this.ring(x, z, r, '#ffd23d', 0.25, 0.02, true); if (f.on) for (let k = 0; k < 6; k++) this.gp(x + (Math.random() - 0.5) * r, Math.random() * 2.4, z + (Math.random() - 0.5) * r, '#e8eef8', 0.7 + Math.random() * 0.6, 0.55); else if (Math.random() < 0.3) this.gp(x, 0.2 + Math.random() * 0.5, z, '#99a', 0.3, 0.4); }
+      else if (f.k === 'acid') { const x = f.x / TS, z = f.y / TS; if (!vis(x, z)) continue; const r = f.r / TS; this.ring(x, z, r, '#7dff3d', 0.45, 0.02, true); this.ring(x, z, r, '#b8ff5a', 0.8, 0.025); if (Math.random() < 0.6) this.gp(x + (Math.random() - 0.5) * r * 1.4, 0.05 + Math.random() * 0.25, z + (Math.random() - 0.5) * r * 1.4, '#a8ff4a', 0.25, 0.9); }
+      else if (f.k === 'ice') { const cx = (f.x + f.w / 2) / TS, cz = (f.y + f.h / 2) / TS; if (!vis(cx, cz, 10)) continue; this.plane(cx, cz, f.h / TS, f.w / TS, 0, '#bfe8ff', 0.22, 0.015); if (Math.random() < 0.3) this.gp(f.x / TS + Math.random() * f.w / TS, 0.05, f.y / TS + Math.random() * f.h / TS, '#ffffff', 0.15, 1); }
+      else if (f.k === 'car') { const x = (f.cx || 0) / TS, z = f.y / TS; this.plane((f.x1 + f.x2) / 2 / TS, z, 0.9, (f.x2 - f.x1) / TS, 0, '#ff3d55', 0.07, 0.02); if (!vis(x, z, 4)) continue; const d = Math.sign(f.sp);
+        this.box(x, 0.3, z, 1.5, 0.4, 0.8, '#1a1a2a', 0.95); this.box(x - d * 0.1, 0.62, z, 0.8, 0.28, 0.7, f.col, 0.55); this.box(x, 0.12, z, 1.6, 0.06, 0.86, f.col, 0.9);
+        this.gp(x + d * 0.78, 0.32, z - 0.25, '#ffffff', 0.5, 1); this.gp(x + d * 0.78, 0.32, z + 0.25, '#ffffff', 0.5, 1); this.gp(x - d * 0.78, 0.32, z, '#ff2040', 0.4, 0.9); this.plane(x + d * 1.8, z, 0.7, 2, 0, '#ffffcc', 0.12, 0.03); }
+      else if (f.k === 'vac') { const x = f.x / TS, z = f.y / TS; if (!vis(x, z, 6)) continue; this.box(x, 0.04, z, 0.9, 0.08, 0.9, '#2a3048', 0.9); this.ring(x, z, 0.5, f.on ? '#6aa8ff' : f.warn ? '#ff3d55' : '#3a4060', 0.9, 0.09);
+        if (f.warn) this.ring(x, z, 320 / TS, '#ff3d55', 0.15 + Math.sin(T * 14) * 0.1); if (f.on) for (let k = 0; k < 5; k++) { const a = Math.random() * 6.28, rr = Math.random() * 6; this.gp(x + Math.cos(a) * rr, 0.3, z + Math.sin(a) * rr, '#9cc4ff', 0.25, 0.8); } }
+    }
+    if (G.onIce) this.ring(px, pz, 0.5, '#cfefff', 0.3, 0.03);
+    if (G.p.chill > 0) this.ring(px, pz, 0.62, '#9fe8ff', 0.6, 0.6);
+    for (const b of this.bfx || []) {
+      if (b[0] === 'snow') { for (let k = 0; k < 40; k++) { const sx = this.ct.x + ((k * 7.3) % 20) - 10, sy = ((k * 3.1 - T * (0.6 + (k % 3) * 0.2)) % 4 + 4) % 4, sz = this.ct.z + ((k * 11.7) % 14) - 7 + Math.sin(T + k) * 0.3; this.gp(sx, sy, sz, '#ffffff', 0.12, 0.8); } continue; }
+      if (!vis(b[1], b[3], 1)) continue;
+      if (b[0] === 'smoke') for (let k = 0; k < 3; k++) { const ph = (T * 0.4 + k / 3 + b[1]) % 1; this.gp(b[1] + Math.sin(ph * 5 + b[3]) * 0.3, b[2] + ph * 2.2, b[3], '#8a8070', 0.6 + ph * 1.2, 0.35 * (1 - ph)); }
+      else if (b[0] === 'bub') { const ph = (T * 0.7 + b[1] * 3) % 1; this.gp(b[1] + Math.sin(T * 3 + b[3]) * 0.1, b[2] + ph * 1.0, b[3], '#b0ffe0', 0.12, 1 - ph); this.gp(b[1], 0.7, b[3], '#3dffb0', 0.9, 0.35); }
+      else if (b[0] === 'star') this.gp(b[1], b[2], b[3], '#ffffff', 0.06, 0.6 + Math.sin(T * 4 + b[1] * 9) * 0.4);
+      else if (b[0] === 'con') this.gp(b[1], b[2], b[3], Math.floor(T * 3 + b[1]) % 2 ? '#3dffa0' : '#6aa8ff', 0.25, 1);
+    }
     // фонари, терминалы, алтари
     for (const [x, z] of this.lamps || []) if (vis(x, z, 1)) { this.gp(x, this.WH + 0.95, z, G.pal.edge, 0.9, 0.7 + Math.sin(T * 3 + x) * 0.2); this.gp(x, this.WH + 0.95, z, '#ffffff', 0.25, 0.9); }
     (lv.terms || []).forEach((tm, i) => {

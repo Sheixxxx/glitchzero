@@ -24,6 +24,7 @@ const Enemies = {
     if (G.mods.regen && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02 * dt);
     if (!e.aggro) { if ((rdist < 400 && !hid) || e.hp < e.maxHp) e.aggro = true; else return; }
     if (hid && md < 20) { e.t += dt; return; }
+    if (e.orbit) { if (e.orbit !== G.boss) { e.orbit = null; } else { if (e.cd <= 0) { e.cd = 2.4 + Math.random(); G.ebullet(e.x, e.y, Math.atan2(p.y - e.y, p.x - e.x), 230, e.dmg); } return; } }
     let mx = 0, my = 0, sp = e.spd * slow;
     switch (e.ai) {
       case 'chase': mx = nx; my = ny; break;
@@ -149,6 +150,35 @@ const Enemies = {
         if (ph === 3) { if (b.cd2 <= 0) { b.cd2 = 3; for (let i = 0; i < 3; i++) zone(p.x + (Math.random() - 0.5) * 160, p.y + (Math.random() - 0.5) * 160); } if (b.cd3 <= 0) { b.cd3 = 0.13; b.a += 0.37; G.ebullet(b.x, b.y, b.a, 180, dm * 0.7); } }
         else if (b.cd2 <= 0) { b.cd2 = 2; ring(8, 170, b.t); }
         break;
+      case 'crusher': { // пресс-гигант
+        if (b.st === 0) { moveTo(p.x, p.y, 55 + ph * 12);
+          if (b.cd <= 0) { b.cd = ph === 3 ? 2.2 : 3; G.tele.push({ k: 'circle', x: b.x, y: b.y, r: 160, t: 0, dur: 1.0, dmg: dm * 2.2, col: b.col }); b.st = 1; b.stT = 1.0; }
+          if (b.cd2 <= 0) { b.cd2 = ph === 1 ? 3.5 : 2.4; const n = 3 + ph * 2; for (let i = 0; i < n; i++) zone(p.x + (Math.random() - 0.5) * 300, p.y + (Math.random() - 0.5) * 300, 50); }
+          if (ph >= 2 && b.cd3 <= 0) { b.cd3 = 4; b.st = 3; b.stT = 0.6; b.da = aim; G.tele.push({ k: 'line', x1: b.x, y1: b.y, x2: b.x + Math.cos(aim) * 600, y2: b.y + Math.sin(aim) * 600, w: b.r * 2, t: 0, dur: 0.6, dmg: 0, col: b.col, ally: true }); } }
+        else if (b.st === 1) { b.stT -= dmt; b.squash = 1 - b.stT; if (b.stT <= 0) { b.st = 0; b.squash = 0; G.shake(16); G.burst(b.x, b.y, b.col, 50, 420); if (ph >= 2) ring(16, 240, b.t); } }
+        else if (b.st === 3) { b.stT -= dmt; if (b.stT <= 0) { b.st = 4; b.stT = 0.5; SFX.play('dash'); } }
+        else { b.x += Math.cos(b.da) * 820 * dt * slow; b.y += Math.sin(b.da) * 820 * dt * slow; b.stT -= dmt; const hit = G.collide(b); G.trailP(b.x, b.y, b.col); if (dist < b.r + p.r) G.hurtPlayer(dm * 1.6, null); if (b.stT <= 0 || hit) { b.st = 0; G.shake(8); ring(10, 220, b.da); } }
+        if (ph === 3 && !b.adds) { b.adds = true; for (let i = 0; i < 3; i++) G.spawnEnemy('miner', b.x + (i - 1) * 90, b.y + 60).aggro = true; }
+        G.beltMul = ph === 3 ? 2.2 : ph === 2 ? 1.5 : 1;
+        break; }
+      case 'cryo': { // королева льда
+        moveTo(C.x + Math.cos(b.t * 0.5) * 170, C.y + Math.sin(b.t * 0.5) * 170, 90);
+        if (dist < 210) G.p.chill = 0.3;
+        if (b.cd <= 0) { b.cd = ph === 3 ? 1.8 : 2.6; const n = ph === 1 ? 5 : 8; for (let i = 0; i < n; i++) beam(aim + i / n * Math.PI * 2, 18, 1.0); }
+        if (b.cd2 <= 0) { b.cd2 = ph === 1 ? 2.2 : 1.4; fan(ph + 2, 0.22, 240); }
+        if (ph >= 2 && b.cd3 <= 0) { b.cd3 = 7; for (let i = 0; i < 2; i++) { const e = G.spawnEnemy('shielder', b.x + (i ? 70 : -70), b.y); e.col = '#9fe8ff'; e.aggro = true; } }
+        if (ph === 3) { b.sp2 = (b.sp2 || 0) - dmt; if (b.sp2 <= 0) { b.sp2 = 0.09; b.a += 0.41; G.ebullet(b.x, b.y, b.a, 150, dm * 0.6); G.ebullet(b.x, b.y, b.a + Math.PI, 150, dm * 0.6); } }
+        break; }
+      case 'hive': { // матка дронов с щитом из роя
+        b.orb = (b.orb || []).filter(e => !e.dead);
+        if (!b.orbInit || (b.orb.length === 0 && b.cd3 <= 0)) { b.orbInit = true; b.cd3 = 12; for (let i = 0; i < 4 + ph * 2; i++) { const e = G.spawnEnemy('drone', b.x, b.y); e.orbit = b; e.oi = i; e.aggro = true; e.hp = e.maxHp = 90; b.orb.push(e); } G.banner('РОЙ-ЩИТ', b.col, 'Уничтожьте дронов!'); }
+        b.orb.forEach((e, i) => { const a = b.t * 1.4 + i / b.orb.length * Math.PI * 2; e.x = b.x + Math.cos(a) * (b.r + 50); e.y = b.y + Math.sin(a) * (b.r + 50); });
+        b.armor = b.orb.length ? 0.25 : 1;
+        moveTo(C.x + Math.cos(b.t * 0.3) * 260, C.y - 120 + Math.sin(b.t * 0.6) * 80, 70);
+        if (b.cd <= 0) { b.cd = ph === 3 ? 2 : 3; const n = 6 + ph * 3; for (let i = 0; i < n; i++) setTimeout(() => { if (G.boss === b) zone(p.x + (Math.random() - 0.5) * 260, p.y + (Math.random() - 0.5) * 260, 45); }, i * 90); }
+        if (b.cd2 <= 0) { b.cd2 = 2.6; fan(5, 0.12, 300); }
+        if (ph >= 2) lasers(ph === 3 ? 3 : 1, 520, 0.5);
+        break; }
       case 'zero': case 'null': {
         const fast = b.id === 'null' ? 0.65 : 1;
         if (b.id === 'null' && b.cd3 <= 0) { b.cd3 = 3.2; G.burst(b.x, b.y, '#fff', 30, 300); b.x = C.x + (Math.random() - 0.5) * 600; b.y = C.y + (Math.random() - 0.5) * 600; G.collide(b); G.glitchT = 0.3; }

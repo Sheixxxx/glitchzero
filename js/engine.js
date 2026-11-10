@@ -165,9 +165,9 @@ const G = {
     if (c.mode === 'boss') return c.boss;
     if (c.mode === 'secret') return 'null';
     if (this.rules.bosses) return this.rules.bosses[R.sector - 1];
-    if (c.mode === 'campaign' && R.stage % 5 === 0) return ['firewall', 'serpent', 'overclock', 'eye', 'firewall', 'zero'][R.stage / 5 - 1];
-    if ((c.mode === 'endless' || c.mode === 'chaos') && R.sector % 5 === 0) return ['firewall', 'serpent', 'overclock', 'eye', 'zero'][(R.sector / 5 - 1) % 5];
-    if (c.mode === 'daily' && R.sector === 5) return ['firewall', 'serpent', 'overclock', 'eye', 'zero'][strSeed(P.today()) % 5];
+    if (c.mode === 'campaign' && R.stage % 5 === 0) return ['firewall', 'serpent', 'overclock', 'eye', 'cryo', 'zero'][R.stage / 5 - 1];
+    if ((c.mode === 'endless' || c.mode === 'chaos') && R.sector % 5 === 0) return ['firewall', 'crusher', 'serpent', 'cryo', 'overclock', 'hive', 'eye', 'zero'][(R.sector / 5 - 1) % 8];
+    if (c.mode === 'daily' && R.sector === 5) return ['firewall', 'serpent', 'overclock', 'eye', 'zero', 'crusher', 'cryo', 'hive'][strSeed(P.today()) % 8];
     return null;
   },
   nextSector() {
@@ -192,14 +192,16 @@ const G = {
       coreMod: this.cs.core + (ev.void ? -2 : 0), extraChests: (ev.treasure ? 3 : 0) + ((this.route && this.route.chests) || 0), extraSecret: this.cs.fx.has('sense') && r() < 0.3
     };
     if (this.route && this.route.enMul) opt.enMul *= this.route.enMul; if (this.route && this.route.shop) ev.merchant = true;
-    const lv = this.lv = bossId ? LevelGen.genArena(seed, D.BIOMES[R.sector % 5]) : LevelGen.gen(seed, diff, opt);
+    const BB = bossId && D.BOSSM[bossId], abio = BB && (D.BIOMES.find(q => q.id === BB.biome) || D.BIOMES[R.sector % 5]);
+    const lv = this.lv = bossId ? LevelGen.genArena(seed, abio, BB.arena) : LevelGen.gen(seed, diff, opt);
+    if (bossId) this.arenaFeats(lv, bossId);
     const fc = P.cos('field'); this.pal = fc.v || lv.biome;
     if (!bossId) this.stat('bio_' + lv.biome.id);
     // сущности
     this.enemies = []; this.pb = []; this.eb = []; this.parts = []; this.texts = []; this.pick = []; this.tele = []; this.holes = []; this.vfx = []; this.rifts = [];
     this.chests = lv.chests.map(c => Object.assign({ open: false }, c));
     this.crack = {}; this.boss = null; this.merchant = null; this.portalOpen = !bossId && lv.need <= 0;
-    this.coresHave = 0; this.need = lv.need; this.slowT = 0; this.glitchT = 0; this.secDmg = 0; this.secTime = 0; this.evT = 12; this.stormT = 3;
+    this.coresHave = 0; this.need = lv.need; this.slowT = 0; this.beltMul = 1; this.intro = null; this.glitchT = 0; this.secDmg = 0; this.secTime = 0; this.evT = 12; this.stormT = 3;
     lv.enemies.forEach(e => { this.spawnEnemy(e.type, e.x, e.y).room = e.room; if (ev.clones) this.spawnEnemy(e.type, e.x + 20, e.y + 10).room = e.room; });
     this.tpCd = 0; this.hidden = false; this.lockT = 0;
     this.amb = Array.from({ length: 45 }, () => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() * 2, v: 4 + Math.random() * 12, ph: Math.random() * 6 }));
@@ -215,7 +217,7 @@ const G = {
     if (this.mods.fragile && !rl.oneHp) { p.maxHp = Math.round(this.cs.maxHp * 0.75); p.hp = Math.min(p.hp, p.maxHp); } else if (!rl.oneHp) p.maxHp = this.cs.maxHp;
     if (bossId) {
       const b = this.boss = Enemies.boss(this, bossId, lv.portal.x, lv.portal.y - 60, diff);
-      this.banner(b.n, b.col, 'БОСС'); SFX.mode('boss'); SFX.play('boss');
+      this.intro = { t: 0, d: 3.2, n: b.n, sub: D.BOSSM[bossId].t || '', col: b.col, desc: D.BOSSM[bossId].d }; SFX.mode('boss'); SFX.play('boss'); setTimeout(() => { if (this.boss === b) { this.shake(18); SFX.play('boom'); this.burst(b.x, b.y, b.col, 90, 520); } }, 1500);
     } else {
       SFX.mode('game');
       this.banner('СЕКТОР ' + R.sector + (this.total !== Infinity ? '/' + this.total : ''), '#00f0ff', lv.biome.n.toUpperCase());
@@ -258,6 +260,25 @@ const G = {
     if (route && route.loot) M.loot = route.loot;
     this.ms = M; this.secCombo = 0;
     setTimeout(() => { if (this.ms === M) this.banner(M.n, '#00f0ff', 'ЗАДАНИЕ', M.d + ' • Бонус: ' + M.side[1]); }, 2600);
+  },
+  arenaFeats(lv, id) {
+    const W = lv.W * TS, H = lv.H * TS;
+    if (id === 'crusher') { lv.feats.push({ k: 'belt', x: 3 * TS, y: 3 * TS, w: W - 6 * TS, h: 2 * TS, dx: 1, dy: 0 }, { k: 'belt', x: 3 * TS, y: H - 5 * TS, w: W - 6 * TS, h: 2 * TS, dx: -1, dy: 0 }); [[6, 12], [19, 12]].forEach(([x, y]) => lv.feats.push({ k: 'steam', x: x * TS, y: y * TS, r: 52, t: x, per: 3 })); }
+    if (id === 'cryo') { lv.feats.push({ k: 'ice', x: 4 * TS, y: 4 * TS, w: W - 8 * TS, h: H - 8 * TS }); }
+    if (id === 'hive') { [[5, 5], [20, 20], [20, 5], [5, 20]].forEach(([x, y], i) => lv.feats.push({ k: 'vac', x: x * TS, y: y * TS, t: i * 2, per: 8 })); }
+    if (id === 'eye' || id === 'null') lv.feats.push({ k: 'acid', x: 6 * TS, y: 13 * TS, r: 55 }, { k: 'acid', x: 20 * TS, y: 13 * TS, r: 55 });
+  },
+  updFeats(dt) {
+    const p = this.p, F = this.lv.feats; this.featSlow = 1; this.onIce = false; if (!F || !F.length) return;
+    const inR = (f, o) => o.x > f.x && o.x < f.x + f.w && o.y > f.y && o.y < f.y + f.h, bm = this.beltMul || 1;
+    for (const f of F) {
+      if (f.k === 'belt') { const sp = 115 * bm * dt; if (inR(f, p) && p.dashT <= 0) { p.x += f.dx * sp; p.y += f.dy * sp; } for (const e of this.enemies) if (inR(f, e)) { e.x += f.dx * sp; e.y += f.dy * sp; } for (const k of this.pick) if (inR(f, k)) { k.x += f.dx * sp * 0.8; k.y += f.dy * sp * 0.8; } }
+      else if (f.k === 'steam') { f.t += dt; const ph = (f.t % f.per) / f.per; f.on = ph > 0.7; f.warn = ph > 0.5 && !f.on; if (f.on) { if (Math.hypot(p.x - f.x, p.y - f.y) < f.r) this.hurtPlayer(10 * (1 + this.diff * 0.04), null); for (const e of this.enemies) if (Math.hypot(e.x - f.x, e.y - f.y) < f.r && this.frame % 10 === 0) this.hurtEnemy(e, 8, { noFx: true }); } }
+      else if (f.k === 'acid') { if (Math.hypot(p.x - f.x, p.y - f.y) < f.r) { this.featSlow = 0.55; if (this.frame % 20 === 0) this.hurtPlayer(5, null); } for (const e of this.enemies) if (Math.hypot(e.x - f.x, e.y - f.y) < f.r && this.frame % 20 === 0) this.hurtEnemy(e, 6, { noFx: true }); }
+      else if (f.k === 'ice') { if (inR(f, p)) this.onIce = true; }
+      else if (f.k === 'car') { f.t += dt * Math.abs(f.sp) / (f.x2 - f.x1 + 400); const L = f.x2 - f.x1 + 400, u = (f.t % 1) * L, x = f.sp > 0 ? f.x1 - 200 + u : f.x2 + 200 - u; f.cx = x; f.warn = true; if (Math.abs(p.x - x) < 40 && Math.abs(p.y - f.y) < 26 && p.inv <= 0) { this.hurtPlayer(22, null); p.y += (p.y < f.y ? -1 : 1) * 40; this.shake(8); } for (const e of this.enemies) if (Math.abs(e.x - x) < 40 && Math.abs(e.y - f.y) < 26 && (e.carCd || 0) < this.run.time) { e.carCd = this.run.time + 0.6; this.hurtEnemy(e, 60, { noFx: true }); } }
+      else if (f.k === 'vac') { f.t += dt; const ph = (f.t % f.per) / f.per; f.on = ph > 0.72; f.warn = ph > 0.55 && !f.on; if (f.on) { const pull = (o, k) => { const dx = f.x - o.x, dy = f.y - o.y, d = Math.hypot(dx, dy); if (d < 320 && d > 10) { o.x += dx / d * k * dt * (1 - d / 360); o.y += dy / d * k * dt * (1 - d / 360); } }; pull(p, 230); this.enemies.forEach(e => pull(e, 260)); this.pick.forEach(k => pull(k, 300)); if (Math.hypot(p.x - f.x, p.y - f.y) < 30) this.hurtPlayer(12, null); for (const e of this.enemies) if (Math.hypot(e.x - f.x, e.y - f.y) < 30 && this.frame % 8 === 0) this.hurtEnemy(e, 20, { noFx: true }); } }
+    }
   },
   bfsPath(x1, y1, x2, y2) {
     const lv = this.lv, W = lv.W, s = Math.floor(y1 / TS) * W + Math.floor(x1 / TS), g = Math.floor(y2 / TS) * W + Math.floor(x2 / TS), prev = new Int32Array(lv.t.length).fill(-1), q = [s]; prev[s] = s;
@@ -630,7 +651,8 @@ const G = {
     if (R.combo % 10 === 0) { this.banner('КОМБО ×' + R.combo, '#ff3dc8'); SFX.vib(20); }
   },
   hurtBoss(dmg) {
-    const b = this.boss; if (!b || b.dead) return;
+    const b = this.boss; if (!b || b.dead || this.intro) return;
+    if (b.armor !== undefined && b.armor < 1) { dmg *= b.armor; if (this.frame % 20 === 0) this.floatText(b.x, b.y - b.r - 10, 'ЩИТ РОЯ', '#6aa8ff'); }
     const c = this.crit(); if (c) dmg *= this.cs.critd; dmg *= this.dmgMul();
     b.hp -= dmg; b.flash = 0.06; this.stat('damage', dmg);
     this.p.sup = Math.min(1, this.p.sup + dmg / 500 * this.cs.sup);
@@ -700,7 +722,8 @@ const G = {
       if (p.superDash) for (const e of this.enemies.slice()) if (!p.sdHit.has(e) && Math.hypot(e.x - p.x, e.y - p.y) < e.r + p.r + 14) { p.sdHit.add(e); this.hurtEnemy(e, p.superDash, {}); }
       if (p.superDash && this.boss && !p.sdHit.has(this.boss) && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < this.boss.r + p.r + 14) { p.sdHit.add(this.boss); this.hurtBoss(p.superDash); }
       if (p.dashT <= 0) p.superDash = 0;
-    } else { const bs = (p.boostT > 0 ? 1.7 : 1); p.x += m.x * cs.spd * bs * dt; p.y += m.y * cs.spd * bs * dt; if (p.boostT > 0 && this.frame % 2 === 0) this.trailP(p.x, p.y, '#00f0ff'); }
+    } else { const bs = (p.boostT > 0 ? 1.7 : 1) * (this.featSlow || 1) * (p.chill > 0 ? 0.6 : 1); let vx = m.x * cs.spd * bs, vy = m.y * cs.spd * bs; if (this.onIce) { const k = Math.min(1, dt * 2.2); p.ivx = (p.ivx || 0) + (vx - (p.ivx || 0)) * k; p.ivy = (p.ivy || 0) + (vy - (p.ivy || 0)) * k; vx = p.ivx; vy = p.ivy; if ((Math.abs(vx) > 40 || Math.abs(vy) > 40) && this.frame % 3 === 0) this.trailP(p.x, p.y, '#cfefff'); } else { p.ivx = vx; p.ivy = vy; } p.x += vx * dt; p.y += vy * dt; if (p.boostT > 0 && this.frame % 2 === 0) this.trailP(p.x, p.y, '#00f0ff'); }
+    p.chill = (p.chill || 0) - dt; this.updFeats(dt);
     this.updateTiles(dt); if (this.frame % 6 === 0) this.updateRooms(dt * 6);
     if (m.x || m.y) { p.still = 0; if (!this.mouse.down) p.ang = Math.atan2(m.y, m.x); } else { p.still += dt; if (p.still > 30 && !p.afk) { p.afk = true; this.stat('afk'); } }
     this.collide(p);
@@ -719,7 +742,8 @@ const G = {
     // враги
     for (const e of this.enemies) { if (e.dead) continue; if (Math.abs(e.x - p.x) > 1100 || Math.abs(e.y - p.y) > 1100) continue; Enemies.update(this, e, dt); }
     this.enemies = this.enemies.filter(e => !e.dead);
-    if (this.boss) Enemies.bossUpdate(this, this.boss, dt);
+    if (this.intro) { this.intro.t += dt; p.inv = Math.max(p.inv, 0.2); if (this.intro.t > this.intro.d) this.intro = null; }
+    if (this.boss && !this.intro) Enemies.bossUpdate(this, this.boss, dt);
     // снаряды игрока
     for (const b of this.pb) {
       b.life -= dt; const ox = b.x, oy = b.y; b.x += b.vx * dt; b.y += b.vy * dt;
@@ -1213,6 +1237,14 @@ const G = {
     if (tg) { const pq = this.proj(tg.x, tg.y), sx = pq.x, sy = pq.y; if (sx < 20 || sy < 20 || sx > W - 20 || sy > H - 20) { const a = Math.atan2(sy - H / 2, sx - W / 2), rx = W / 2 - 40, ry = H / 2 - 60, t = Math.min(Math.abs(rx / Math.cos(a)), Math.abs(ry / Math.sin(a))); c.save(); c.translate(W / 2 + Math.cos(a) * t, H / 2 + Math.sin(a) * t); c.rotate(a); c.fillStyle = this.portalOpen ? '#3dffa0' : '#00f0ff'; c.globalAlpha = 0.6 + Math.sin(T * 6) * 0.3; c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-4, 0); c.lineTo(-8, 10); c.closePath(); c.fill(); c.restore(); } }
     // баннер
     if (this.bn) { const b = this.bn; b.t += 1 / 60; const f = b.t < 0.25 ? b.t / 0.25 : b.t > 2.2 ? Math.max(0, 1 - (b.t - 2.2) / 0.4) : 1; if (b.t > 2.6) this.bn = null; else { c.globalAlpha = f; c.textAlign = 'center'; const y = H * 0.3; if (b.sub) { c.font = 'bold 11px Unbounded,sans-serif'; c.fillStyle = '#aab'; c.fillText(b.sub, W / 2, y - 26); } c.font = '900 ' + Math.min(34, W / 12) + 'px Unbounded,sans-serif'; c.fillStyle = b.col; this.glow(c, b.col, 20); c.fillText(b.s, W / 2 + (1 - f) * 40, y); this.glow(c, 0, 0); if (b.d2) { c.font = '12px Manrope,sans-serif'; c.fillStyle = '#dde'; c.fillText(b.d2, W / 2, y + 28); } c.globalAlpha = 1; } }
+    if (this.intro) { const I = this.intro, f = Math.min(1, I.t / 0.4), o = I.t > I.d - 0.5 ? Math.max(0, (I.d - I.t) / 0.5) : 1, bh = H * 0.13 * f * o;
+      c.fillStyle = '#000'; c.fillRect(0, 0, W, bh); c.fillRect(0, H - bh, W, bh);
+      if (I.t > 0.5) { const a = Math.min(1, (I.t - 0.5) / 0.4) * o, sl = (1 - Math.min(1, (I.t - 0.5) / 0.4)) * 80; c.globalAlpha = a; c.textAlign = 'center';
+        c.font = 'bold 11px Unbounded,sans-serif'; c.fillStyle = '#ff3d55'; c.fillText('⚠ УГРОЗА УРОВНЯ ОМЕГА ⚠', W / 2, H * 0.62);
+        c.font = '900 ' + Math.min(52, W / 8) + 'px Unbounded,sans-serif'; this.glow(c, I.col, 30); c.fillStyle = I.col; c.fillText(I.n, W / 2 - sl, H * 0.62 + 46); this.glow(c, 0, 0);
+        c.fillStyle = '#fff'; c.font = 'italic 13px Manrope,sans-serif'; c.fillText('«' + I.sub + '»', W / 2 + sl, H * 0.62 + 74);
+        c.fillStyle = 'rgba(255,255,255,0.6)'; c.font = '11px Manrope,sans-serif'; c.fillText(I.desc, W / 2, H - bh - 14);
+        c.fillStyle = I.col; c.fillRect(W / 2 - 120 * a, H * 0.62 + 86, 240 * a, 2); c.globalAlpha = 1; } }
     if (P.s.settings.fps) { c.fillStyle = '#0f0'; c.font = '10px monospace'; c.textAlign = 'left'; c.fillText(this.fps + ' FPS', safe, H - 10); }
     // тач-кнопки
     if (this.touch) {
