@@ -13,11 +13,15 @@ const Enemies = {
   },
   update(G, e, dt) {
     const p = G.p, slow = (G.slowT > 0 ? 0.35 : 1) * (G.ev.slowmo ? 0.7 : 1) * (e.fz > 0 ? 0.35 : 1);
-    const dx = p.x - e.x, dy = p.y - e.y, dist = Math.hypot(dx, dy) || 1, nx = dx / dist, ny = dy / dist;
+    const rdist = Math.hypot(p.x - e.x, p.y - e.y) || 1, hid = G.hidden && rdist > 120;
+    if (!hid) { e.lsx = p.x; e.lsy = p.y; }
+    const gx = hid ? (e.lsx !== undefined ? e.lsx : e.x) : p.x, gy = hid ? (e.lsy !== undefined ? e.lsy : e.y) : p.y;
+    const dx = gx - e.x, dy = gy - e.y, dist = hid ? Math.max(500, Math.hypot(dx, dy)) : rdist, md = Math.hypot(dx, dy) || 1, nx = dx / md, ny = dy / md;
     e.t += dt; e.cd -= dt * slow; e.hitCd -= dt; e.fz -= dt; e.flash -= dt;
     if (e.burn > 0) { e.burn -= dt; e.burnT = (e.burnT || 0) - dt; if (e.burnT <= 0) { e.burnT = 0.5; G.hurtEnemy(e, e.burnDmg, { noFx: true }); if (e.dead) return; } }
     if (G.mods.regen && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02 * dt);
-    if (!e.aggro) { if (dist < 400 || e.hp < e.maxHp) e.aggro = true; else return; }
+    if (!e.aggro) { if ((rdist < 400 && !hid) || e.hp < e.maxHp) e.aggro = true; else return; }
+    if (hid && md < 20) { e.t += dt; return; }
     let mx = 0, my = 0, sp = e.spd * slow;
     switch (e.ai) {
       case 'chase': mx = nx; my = ny; break;
@@ -35,7 +39,7 @@ const Enemies = {
         else { mx = e.cx; my = e.cy; sp = 430 * slow; e.stT -= dt; if (e.stT <= 0) { e.st = 0; e.cd = 2; } }
         break;
       case 'bomb':
-        if (e.st === 0) { mx = nx; my = ny; if (dist < 55) { e.st = 1; e.stT = 0.6; } }
+        if (e.st === 0) { mx = nx; my = ny; if (rdist < 55) { e.st = 1; e.stT = 0.6; } }
         else { e.stT -= dt; if (e.stT <= 0) { G.explode(e.x, e.y, 80, e.dmg, true); e.hp = 0; G.killEnemy(e, true); return; } }
         break;
       case 'flee':
@@ -50,7 +54,7 @@ const Enemies = {
     }
     const ml = Math.hypot(mx, my); if (ml > 0) { e.x += mx / ml * sp * dt; e.y += my / ml * sp * dt; }
     G.collide(e);
-    if (e.dmg > 0 && e.ai !== 'bomb' && dist < e.r + p.r && e.hitCd <= 0) {
+    if (e.dmg > 0 && e.ai !== 'bomb' && rdist < e.r + p.r && e.hitCd <= 0) {
       e.hitCd = 0.7; G.hurtPlayer(e.dmg, e);
     }
   },

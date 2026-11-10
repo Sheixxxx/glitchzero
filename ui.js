@@ -1,6 +1,21 @@
 'use strict';
 /* ===== UI Manager ===== */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ICO = {
+  shop: '<path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
+  heroes: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.3c3 .3 5 2.6 5 5.7"/>',
+  skills: '<circle cx="12" cy="5" r="2.3"/><circle cx="5.5" cy="18.5" r="2.3"/><circle cx="18.5" cy="18.5" r="2.3"/><path d="M12 7.3v4.2M12 11.5l-5 5M12 11.5l5 5"/>',
+  inv: '<path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M4 12h16M10 12v2h4v-2"/>',
+  museum: '<path d="M3 9l9-5 9 5M5 9v9M9.7 9v9M14.3 9v9M19 9v9M3 20.5h18"/>',
+  quests: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM8.5 13.5l2.5 2.5 4.5-5"/>',
+  ach: '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4 7 21l5-2.8 5 2.8-1.6-7.6"/><path d="m12 6.5.8 1.7 1.8.2-1.3 1.2.4 1.8-1.7-.9-1.7.9.4-1.8-1.3-1.2 1.8-.2z"/>',
+  road: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3.4 4M16 6h3a3 3 0 0 1-3.4 4M12 13v4M8.5 21h7M10 17h4v4h-4z"/>',
+  stats: '<path d="M3 21h18M6 17v-5M11 17V7M16 17v-8M21 4l-5 5-5-2-5 5"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  box: '<path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="M3 7.5v9L12 21l9-4.5v-9M12 12v9"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>'
+};
+const ic = n => '<svg class="i" viewBox="0 0 24 24">' + ICO[n] + '</svg>';
 const UI = {
   el: null, modal: null, scr: 'lobby', f: { ach: 'all', achSt: 'all', inv: 'all', shop: 'offers' }, sel: {},
   init() {
@@ -24,6 +39,7 @@ const UI = {
       onPause: () => this.pause()
     };
     this.applyTheme(); this.go('lobby');
+    const loop = () => { requestAnimationFrame(loop); if (G.state === 'off' || document.getElementById('modal').classList.contains('on')) this.paintStages(performance.now() / 1000); }; loop();
   },
   applyTheme() { const t = P.cos('theme').v; document.documentElement.style.setProperty('--a1', t[0]); document.documentElement.style.setProperty('--a2', t[1]); },
   go(s) { this.scr = s; this.closeModal(); this.render(); this.el.scrollTop = 0; },
@@ -40,60 +56,81 @@ const UI = {
   /* ---------- общие куски ---------- */
   res() {
     const s = P.s;
-    return `<div class="res"><span class="r tr" title="Трофеи">♛ ${fmt(P.trophies())}</span><span class="r cr" title="Кредиты">¤ ${fmt(s.credits)}</span><span class="r gm" title="Осколки">◆ ${fmt(s.gems)}</span><span class="r bt" title="Биты — для улучшения бойцов">⌬ ${fmt(s.bits)}</span></div>`;
+    return `<div class="res"><span class="r tr" title="Трофеи"><i>♛</i>${fmt(P.trophies())}</span><span class="r cr" title="Кредиты"><i>¤</i>${fmt(s.credits)}</span><span class="r gm" title="Осколки"><i>◆</i>${fmt(s.gems)}</span><span class="r bt" title="Биты — для улучшения бойцов"><i>⌬</i>${fmt(s.bits)}</span></div>`;
   },
-  head(title, sub) { return `<div class="top"><button class="back" data-a="go" data-v="lobby">‹</button><div class="ttl"><h2>${title}</h2>${sub ? '<small>' + sub + '</small>' : ''}</div>${this.res()}</div>`; },
+  head(title, sub) { return `<div class="top"><button class="back" data-a="go" data-v="lobby" aria-label="Назад">${ic('back')}</button><div class="ttl"><h2>${title}</h2>${sub ? '<small>' + sub + '</small>' : ''}</div>${this.res()}</div>`; },
   bar(v, max, col) { const p = Math.max(0, Math.min(100, v / max * 100)); return `<div class="bar"><i style="width:${p}%;${col ? 'background:' + col : ''}"></i></div>`; },
   rar(r) { return D.RAR[r].c; },
   itemCard(o, extra = '') {
     const it = D.ITEMS[o.id], eq = Object.values(P.s.eq).includes(o.uid);
     return `<div class="icard r${it.r} ${eq ? 'eq' : ''}" data-a="item" data-v="${o.uid}" style="--rc:${this.rar(it.r)}"><div class="ic">${it.ic}</div><div class="in">${it.n}</div><div class="il">ур. ${o.lvl}</div>${eq ? '<b class="eqb">НАДЕТО</b>' : ''}${extra}</div>`;
   },
-  heroOrb(h, size = 120) { return `<div class="orb" style="--hc:${h.col};width:${size}px;height:${size}px"><div class="orb-c"></div><div class="orb-r"></div><span style="font-size:${size * 0.32}px">${h.n[0]}</span></div>`; },
+  heroOrb(h, size = 120, lock) { return `<canvas class="herocv" data-h="${h.id}" ${lock ? 'data-lock="1"' : ''} width="${size * 2}" height="${size * 2}" style="width:${size}px;height:${size}px"></canvas>`; },
+  // Живой постамент бойца
+  paintStages(T) {
+    const list = document.querySelectorAll('.herocv'); if (!list.length) return;
+    list.forEach(cv => {
+      const H = D.HEROES.find(x => x.id === cv.dataset.h); if (!H) return;
+      const c = cv.getContext('2d'), S = cv.width / 2, cx = S, cy = S * 1.02, col = H.col, R = S * 0.28;
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height); c.setTransform(2, 0, 0, 2, 0, 0);
+      const s = S / 2, X = s, Y = s * 1.15;
+      if (cv.dataset.lock) c.filter = 'grayscale(1) brightness(0.45)';
+      // луч
+      const bg = c.createLinearGradient(0, 0, 0, Y); bg.addColorStop(0, 'rgba(0,0,0,0)'); bg.addColorStop(1, col + '55');
+      c.fillStyle = bg; c.beginPath(); c.moveTo(X - s * 0.18, 0); c.lineTo(X + s * 0.18, 0); c.lineTo(X + s * 0.55, Y + s * 0.1); c.lineTo(X - s * 0.55, Y + s * 0.1); c.fill();
+      // платформа
+      c.save(); c.translate(X, Y + s * 0.42);
+      for (let i = 3; i >= 0; i--) { c.beginPath(); c.ellipse(0, i * 4, s * (0.72 - i * 0.04), s * (0.2 - i * 0.01), 0, 0, 6.28); c.fillStyle = i ? '#0a0818' : '#15102e'; c.fill(); }
+      c.strokeStyle = col; c.lineWidth = 2; c.beginPath(); c.ellipse(0, 0, s * 0.72, s * 0.2, 0, 0, 6.28); c.stroke();
+      c.setLineDash([10, 8]); c.lineDashOffset = -T * 40; c.globalAlpha = 0.7; c.beginPath(); c.ellipse(0, 0, s * 0.55, s * 0.14, 0, 0, 6.28); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+      c.globalCompositeOperation = 'lighter'; G.gl(c, col, 0, 0, s * 0.7, 0.35); c.globalCompositeOperation = 'source-over';
+      c.restore();
+      // частицы
+      for (let i = 0; i < 14; i++) { const ph = (T * 0.4 + i / 14) % 1, a = i * 2.4; c.globalAlpha = (1 - ph) * 0.8; c.fillStyle = col; c.fillRect(X + Math.cos(a) * s * 0.55 * (1 - ph * 0.3), Y + s * 0.4 - ph * s * 1.1, 2, 2); }
+      c.globalAlpha = 1;
+      const bob = Math.sin(T * 2) * s * 0.04;
+      G.paintHero(c, H, P.cos('skin').v, X, Y - s * 0.1 + bob, s * 0.3, -Math.PI / 2 + Math.sin(T * 0.8) * 0.6, T, { glow: 0.5 });
+      c.filter = 'none';
+    });
+  },
 
   /* ---------- ЛОББИ ---------- */
   s_lobby() {
     const s = P.s, h = D.HEROES.find(x => x.id === s.hero), hs = s.heroes[s.hero], md = D.MODES.find(m => m.id === s.mode) || D.MODES[0];
     const need = P.xpNeed(s.lvl), q = P.questsReady(), rd = P.roadReady(), cases = s.cases.c + s.cases.b + s.cases.m;
     const nextRoad = D.ROAD.find(r => r.at > P.trophies()), prevAt = (D.ROAD[D.ROAD.indexOf(nextRoad) - 1] || { at: 0 }).at;
-    const newAch = 0;
+    const sb = (go, icon, name, badge) => `<button class="sb" data-a="go" data-v="${go}"><i>${ic(icon)}</i>${badge ? '<b class="bd">' + badge + '</b>' : ''}${name}</button>`;
+    const sz = Math.min(250, Math.max(190, Math.min(innerWidth * 0.62, innerHeight * 0.34)));
     return `<div class="lobby">
       <div class="ltop">
         <div class="prof" data-a="go" data-v="profile">
-          <div class="av">${esc(s.avatar)}<b class="lv">${s.lvl}</b></div>
+          <div class="av" style="--xp:${Math.round(s.xp / need * 100)}"><span>${esc(s.avatar)}</span><b class="lv">${s.lvl}</b></div>
           <div><div class="nm">${esc(s.name)}${s.prestige ? ' <span class="pres">✺' + s.prestige + '</span>' : ''}</div><div class="tt">${esc(s.title)}</div>${this.bar(s.xp, need)}</div>
         </div>
         ${this.res()}
       </div>
       <div class="lmid">
         <div class="side">
-          <button class="sb" data-a="go" data-v="shop"><i>✦</i>Магазин</button>
-          <button class="sb" data-a="go" data-v="heroes"><i>☺</i>Бойцы</button>
-          <button class="sb" data-a="go" data-v="skills"><i>⟡</i>Навыки${P.spFree() > 0 ? '<b class="bd">' + P.spFree() + '</b>' : ''}</button>
-          <button class="sb" data-a="go" data-v="inventory"><i>▦</i>Инвентарь</button>
-          <button class="sb" data-a="go" data-v="museum"><i>◈</i>Музей</button>
+          ${sb('shop', 'shop', 'Магазин')}${sb('heroes', 'heroes', 'Бойцы')}${sb('skills', 'skills', 'Навыки', P.spFree() > 0 ? P.spFree() : 0)}${sb('inventory', 'inv', 'Арсенал')}${sb('museum', 'museum', 'Музей')}
         </div>
         <div class="stage" data-a="go" data-v="heroes">
-          <div class="glyph-logo" data-a="logo">GLITCH<span>//</span>ZERO</div>
-          ${this.heroOrb(h, 150)}
+          <div class="glyph-logo" data-a="logo" data-t="GLITCH//ZERO">GLITCH<span>//</span>ZERO</div>
+          <div class="logosub">ПРОТОКОЛ ПРОРЫВА</div>
+          ${this.heroOrb(h, sz)}
           <div class="hname" style="color:${h.col}">${h.n}</div>
-          <div class="hsub">${h.role} • Сила ${hs.pow} • ♛ ${hs.tr}</div>
-          ${s.streak > 1 ? '<div class="streak">🔥 Серия побед: ' + s.streak + ' (награды ×' + (1 + 0.08 * Math.min(s.streak, 10)).toFixed(2) + ')</div>' : ''}
+          <div class="hsub"><span>${h.role}</span><span style="color:${h.col}">⚡ Сила ${hs.pow}</span><span style="color:#ffd23d">♛ ${hs.tr}</span></div>
+          ${s.streak > 1 ? '<div class="streak">🔥 Серия ' + s.streak + ' • награды ×' + (1 + 0.08 * Math.min(s.streak, 10)).toFixed(2) + '</div>' : ''}
         </div>
         <div class="side">
-          <button class="sb" data-a="go" data-v="quests"><i>✓</i>Задания${q ? '<b class="bd">' + q + '</b>' : ''}</button>
-          <button class="sb" data-a="go" data-v="achievements"><i>★</i>Достижения</button>
-          <button class="sb" data-a="go" data-v="road"><i>♛</i>Путь${rd ? '<b class="bd">' + rd + '</b>' : ''}</button>
-          <button class="sb" data-a="go" data-v="stats"><i>▤</i>Статистика</button>
-          <button class="sb" data-a="go" data-v="settings"><i>⚙</i>Настройки</button>
+          ${sb('quests', 'quests', 'Задания', q)}${sb('achievements', 'ach', 'Награды')}${sb('road', 'road', 'Путь', rd)}${sb('stats', 'stats', 'Статистика')}${sb('settings', 'settings', 'Опции')}
         </div>
       </div>
       <div class="lbot">
-        <div class="roadmini" data-a="go" data-v="road">${nextRoad ? `<span>♛ ${P.trophies()} / ${nextRoad.at}</span>${this.bar(P.trophies() - prevAt, nextRoad.at - prevAt, 'linear-gradient(90deg,#ffb020,#fff066)')}` : '<span>Путь трофеев пройден!</span>'}</div>
+        <div class="roadmini" data-a="go" data-v="road">${nextRoad ? `<span>♛ ${P.trophies()}</span>${this.bar(P.trophies() - prevAt, nextRoad.at - prevAt, 'linear-gradient(90deg,#ff8a00,#fff066)')}<span>${nextRoad.at}</span>` : '<span>Путь трофеев пройден!</span>'}</div>
         <div class="lbtns">
-          <button class="casebtn ${cases ? 'has' : ''}" data-a="cases"><i>▣</i><b>${cases}</b><small>Кейсы</small></button>
+          <button class="casebtn ${cases ? 'has' : ''}" data-a="cases"><i>${ic('box')}</i><b>${cases}</b><small>КЕЙСЫ</small></button>
           <button class="modebtn" data-a="go" data-v="modes" style="--mc:${md.c}"><i>${md.ic}</i><div><b>${md.n}</b><small>${this.modeSub(md.id)}</small></div></button>
-          <button class="play" data-a="play">ИГРАТЬ</button>
+          <button class="play" data-a="play">В БОЙ</button>
         </div>
       </div>
     </div>`;
@@ -145,7 +182,7 @@ const UI = {
       const hs = s.heroes[H.id], own = hs && hs.own, cs = own ? P.calc(H.id) : null;
       const lockTxt = H.unlock.t === 'trophy' ? '♛ ' + H.unlock.v + ' трофеев' : '◆ ' + H.unlock.v;
       h += `<div class="hcard ${own ? '' : 'lock'} ${s.hero === H.id ? 'sel' : ''}" style="--hc:${H.col}">
-        ${this.heroOrb(H, 84)}
+        ${this.heroOrb(H, 120, !own)}
         <b>${H.n}</b><small>${H.role}</small><p>${H.d}</p>
         <div class="sup">★ ${H.sup.n}: ${H.sup.d}</div>
         ${own ? `<div class="hst"><span>❤ ${cs.maxHp}</span><span>⚔ ${Math.round(cs.dmg)}${H.atk.n > 1 ? '×' + H.atk.n : ''}</span><span>⟳ ${cs.reload.toFixed(2)}с</span><span>♛ ${hs.tr}</span></div>
