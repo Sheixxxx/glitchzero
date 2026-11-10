@@ -71,6 +71,7 @@ const UI = {
     const list = document.querySelectorAll('.herocv'); if (!list.length) return;
     list.forEach(cv => {
       const H = D.HEROES.find(x => x.id === cv.dataset.h); if (!H) return;
+      if (P.s.settings.r3d !== false && R3.lobby(cv, H, P.cos('skin').v, !!cv.dataset.lock, T)) return;
       const c = cv.getContext('2d'), S = cv.width / 2, cx = S, cy = S * 1.02, col = H.col, R = S * 0.28;
       c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height); c.setTransform(2, 0, 0, 2, 0, 0);
       const s = S / 2, X = s, Y = s * 1.15;
@@ -378,6 +379,7 @@ const UI = {
       <div class="set"><span>Звуки</span><input type="range" min="0" max="1" step="0.05" value="${st.sfx}" data-in="sfx"></div>
       <div class="set"><span>Музыка</span><input type="range" min="0" max="1" step="0.05" value="${st.music}" data-in="music"></div>
       <div class="set"><span>Размер кнопок</span><input type="range" min="0.8" max="1.3" step="0.05" value="${st.ctrl}" data-in="ctrl"></div>
+      <div class="set"><span>Графика боя</span><div class="seg"><button class="${st.r3d !== false ? 'on' : ''}" data-a="r3d" data-v="1">3D</button><button class="${st.r3d === false ? 'on' : ''}" data-a="r3d" data-v="0">2D</button></div></div>
       ${tg('vib', 'Вибрация')}${tg('shake', 'Тряска экрана')}${tg('fps', 'Показывать FPS')}
       <div class="set"><span>Качество графики</span><div class="seg"><button class="${st.quality === 'high' ? 'on' : ''}" data-a="qual" data-v="high">Высокое</button><button class="${st.quality === 'low' ? 'on' : ''}" data-a="qual" data-v="low">Экономия</button></div></div>
       <h3 class="sec">Сохранения</h3>
@@ -432,7 +434,8 @@ const UI = {
       case 'avatar': s.avatar = v; P.save(); this.render(); break;
       case 'title': s.title = v; P.save(); this.render(); break;
       case 'tog': s.settings[v] = !s.settings[v]; P.save(); this.render(); break;
-      case 'qual': s.settings.quality = v; P.save(); G.resize(); this.render(); break;
+      case 'r3d': s.settings.r3d = v === '1'; P.save(); this.render(); break;
+      case 'qual':s.settings.quality = v; P.save(); G.resize(); this.render(); break;
       case 'export': { const ta = document.getElementById('impTxt'); if (ta) ta.value = SaveSys.exportJSON(s); this.toast({ n: 'Сохранение готово', d: 'Текст в поле ниже — скопируйте его. В обычном браузере также скачается файл.' }); const b = new Blob([SaveSys.exportJSON(s)], { type: 'application/json' }); const u = URL.createObjectURL(b); const l = document.createElement('a'); l.href = u; l.download = 'glitchzero-save-' + P.today() + '.json'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); break; }
       case 'copysave': { const txt = SaveSys.exportJSON(s); const ta = document.getElementById('impTxt'); ta.value = txt; ta.select(); try { navigator.clipboard.writeText(txt).then(() => this.toast({ n: 'Скопировано' })); } catch (e) { document.execCommand('copy'); } break; }
       case 'importtxt': this.doImport(document.getElementById('impTxt').value); break;

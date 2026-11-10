@@ -4,6 +4,7 @@
   const L = SaveSys.load();
   P.init(L.s);
   G.init(document.getElementById('game'));
+  R3.init();
   UI.init();
   if (L.st === 'backup') UI.toast({ n: 'Сохранение восстановлено', d: 'Основной файл был повреждён — загружена резервная копия' });
   if (L.st === 'corrupt') UI.toast({ n: 'Сохранение повреждено', d: 'Начата новая игра' });

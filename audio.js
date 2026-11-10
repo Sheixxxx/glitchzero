@@ -69,6 +69,6 @@ const SFX = (() => {
     f.type = 'highpass'; f.frequency.value = 7000; g.gain.value = 0.05; s.buffer = b; s.connect(f); f.connect(g); g.connect(musG); s.start(t);
   }
   function mode(m) { musMode = m; }
-  function vib(ms) { if (P.s.settings.vib && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) { } }
+  function vib(ms) { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; if (P.s.settings.vib && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) { } }
   return { init, play, vol, mode, vib };
 })();
