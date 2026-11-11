@@ -8,19 +8,30 @@ const R3 = {
       const T3 = THREE;
       this.cv = document.getElementById('gl');
       this.r = new T3.WebGLRenderer({ canvas: this.cv, antialias: true, powerPreference: 'high-performance' });
-      this.r.setClearColor(0x020108, 1);
-      this.scene = new T3.Scene(); this.scene.fog = new T3.Fog(0x020108, 18, 40);
+      this.r.setClearColor(0x05060a, 1); this.r.outputEncoding = T3.sRGBEncoding; this.r.toneMapping = T3.ACESFilmicToneMapping; this.r.toneMappingExposure = 1.0;
+      this.r.shadowMap.enabled = true; this.r.shadowMap.type = T3.PCFSoftShadowMap; this.r.physicallyCorrectLights = false;
+      this.scene = new T3.Scene(); this.scene.fog = new T3.Fog(0x05060a, 18, 40);
       this.cam = new T3.PerspectiveCamera(45, 1, 0.1, 120);
-      this.scene.add(new T3.HemisphereLight(0xa89cff, 0x1a0c3a, 1.0));
-      this.sun = new T3.DirectionalLight(0xffffff, 0.55); this.sun.position.set(-4, 10, 6); this.scene.add(this.sun);
+      this.hemi = new T3.HemisphereLight(0xc8d0ff, 0x3a3040, 0.95); this.scene.add(this.hemi);
+      this.sun = new T3.DirectionalLight(0xfff2e0, 0.7); this.sun.position.set(-4, 10, 6); this.sun.castShadow = true; this.sun.shadow.mapSize.set(1024, 1024); const sc = this.sun.shadow.camera; sc.left = -14; sc.right = 14; sc.top = 14; sc.bottom = -14; sc.near = 1; sc.far = 40; this.sun.shadow.bias = -0.0008; this.sun.shadow.normalBias = 0.03; this.scene.add(this.sun); this.scene.add(this.sun.target);
+      this.lampL = []; for (let i = 0; i < 4; i++) { const l = new T3.PointLight(0xffd9a0, 0, 9, 2); this.scene.add(l); this.lampL.push(l); }
       this.pl = new T3.PointLight(0x00f0ff, 0.7, 7, 2); this.scene.add(this.pl);
       this.dummy = new T3.Object3D(); this.cols = {}; this.mats = {};
       this.initPoints(); this.initPools();
       this.ok = true; this.resize();
       addEventListener('resize', () => this.resize());
+      if (window.AS) AS.load();
     } catch (e) { console.warn('3D недоступно', e); this.ok = false; }
   },
   active() { return this.ok && P.s.settings.r3d !== false; },
+  onAssets() {
+    try { if (AS.hdr) { const pm = new THREE.PMREMGenerator(this.r); this.envMap = pm.fromEquirectangular(AS.hdr).texture; this.scene.environment = this.envMap; pm.dispose(); } } catch (e) { console.warn(e); }
+    this.initBloom(); this.lhero = {}; if (typeof G !== 'undefined' && G.state === 'play' && this.on) { this.build(G); }
+  },
+  initBloom() {
+    const T3 = THREE; if (!T3.EffectComposer || !T3.UnrealBloomPass || this.composer) return;
+    try { this.composer = new T3.EffectComposer(this.r); this.composer.addPass(new T3.RenderPass(this.scene, this.cam)); this.bloom = new T3.UnrealBloomPass(new T3.Vector2(innerWidth, innerHeight), 0.55, 0.5, 0.93); this.composer.addPass(this.bloom); this.resize(); } catch (e) { this.composer = null; }
+  },
   // адаптивное качество: снижаем разрешение и эффекты, если FPS падает
   lvl: (('ontouchstart' in window) || navigator.maxTouchPoints > 0) ? 1 : 0, lowT: 0, hiT: 0,
   adapt(fps) {
@@ -33,7 +44,8 @@ const R3 = {
     if (!this.ok) return;
     const low = P.s && P.s.settings.quality === 'low';
     this.r.setPixelRatio(Math.min(2, devicePixelRatio || 1) * (low ? 0.55 : 0.9) * [1, 0.8, 0.62, 0.5][this.lvl || 0]);
-    this.r.setSize(innerWidth, innerHeight, false);
+    this.r.setSize(innerWidth, innerHeight, false); if (this.composer) { this.composer.setPixelRatio(this.r.getPixelRatio()); this.composer.setSize(innerWidth, innerHeight); }
+    this.r.shadowMap.enabled = this.lvl < 2; this.sun.shadow.mapSize.set(this.lvl ? 512 : 1024, this.lvl ? 512 : 1024); if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     this.cam.aspect = innerWidth / innerHeight; this.cam.updateProjectionMatrix();
     if (this.pmat) this.pmat.uniforms.uS.value = this.r.getDrawingBufferSize(new THREE.Vector2()).y / (2 * Math.tan(this.cam.fov * Math.PI / 360));
   },
@@ -125,7 +137,24 @@ const R3 = {
     for (let i = 0; i <= 6; i++) { const a = i / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.cos(a) * r, len / 2 + Math.sin(a) * r)); }
     return this.geo[k] = new THREE.LatheGeometry(pts, seg);
   },
+  heroTP(H, skin) {
+    const T3 = THREE, g = new T3.Group(), SKC = { tri: '#ff7a1a', diamond: '#cfefff', hex: '#6a8a4a', star: '#ffc83d', ring: '#f4f4ff', glitch: '#ff3dc8' };
+    const base = new T3.Mesh(new T3.TorusGeometry(0.42, 0.025, 8, 40), this.M(H.col, { basic: 1 })); base.rotation.x = Math.PI / 2; base.position.y = 0.03; g.add(base); g.userData.base = base;
+    const piv = new T3.Group(); g.add(piv); g.userData.piv = piv;
+    const tint = SKC[skin] || (H.id === 'spark' ? null : H.col), ch = AS.char(AS.HERO[H.id], 1.85, tint); ch.rotation.y = Math.PI / 2; piv.add(ch); g.userData.char = ch;
+    if (false) { /* оружие в руке астронавта */ let hand = null; ch.traverse(o => { if (!hand && o.isBone && /hand.?r|r.?hand|palm.?r|wrist.?r/i.test(o.name)) hand = o; }); if (hand) { const gn = AS.gltf.gun_smg.scene.clone(true), bx = new T3.Box3().setFromObject(gn), sz = bx.getSize(new T3.Vector3()), k = 0.55 / Math.max(sz.x, sz.z, 0.01); ch.updateMatrixWorld(true); const ws = new T3.Vector3(); hand.getWorldScale(ws); gn.scale.setScalar(k / Math.max(0.0001, ws.x)); gn.rotation.set(0, Math.PI / 2, 0); hand.add(gn); } }
+    const glow = new T3.PointLight(this.C(H.col), 0.35, 2.5, 2); glow.position.set(0, 0.4, -0.6); g.add(glow);
+    return g;
+  },
+  enemyTP(e) {
+    const T3 = THREE, cfg = AS.ENEMY[e.type], g = new T3.Group(), r = e.r / TS * 1.25, body = new T3.Group(); g.add(body); g.userData.body = body;
+    const tint = e.elite ? '#ffd23d' : cfg[2] || null, ch = AS.char(cfg[0], cfg[1] * (e.elite ? 1.35 : 1) * (e.r > 20 ? 1.15 : 1), tint); body.add(ch); g.userData.char = ch;
+    const th = new T3.Group(); th.position.y = 0.03; g.add(th); g.userData.threat = th;
+    const rm = new T3.Mesh(this.ringGeo, new T3.MeshBasicMaterial({ color: 0xff2040, transparent: true, opacity: 0.85, side: T3.DoubleSide, depthWrite: false })); rm.rotation.x = -Math.PI / 2; rm.scale.set(r * 1.5, r * 1.5, 1); th.add(rm);
+    g.userData.r = r; return g;
+  },
   heroModel(H, skin) {
+    if (window.AS && AS.ready && AS.HERO[H.id] && AS.gltf[AS.HERO[H.id]]) return this.heroTP(H, skin);
     const T3 = THREE, g = new T3.Group(), col = H.col, hid = H.id;
     const glow = this.M(col, { basic: 1 }), wht = this.M('#ffffff', { basic: 1 });
     const tint = { tri: '#ff9a3d', diamond: '#9fe8ff', hex: '#3dffa0', star: '#ffd23d', ring: '#ffffff', glitch: '#ff3dc8' }[skin];
@@ -244,6 +273,7 @@ const R3 = {
     g.scale.setScalar(1.55); return g;
   },
   enemyModel(e) {
+    if (window.AS && AS.ready && AS.ENEMY[e.type] && AS.gltf[AS.ENEMY[e.type][0]]) return this.enemyTP(e);
     const T3 = THREE, g = new T3.Group(), col = e.col, m = this.M(col), r = e.r / TS * 1.25;
     const body = new T3.Group(); g.add(body); g.userData.body = body;
     const add = (geo, mat, y = r, x = 0, z = 0) => { const o = new T3.Mesh(geo, mat || m); o.position.set(x, y, z); body.add(o); return o; };
@@ -287,6 +317,8 @@ const R3 = {
     g.userData.r = r; return g;
   },
   bossModel(b) {
+    const BM = { firewall: ['mech2', 4.2], overclock: ['mech1', 3.8], zero: ['mech4', 4.6], crusher: ['mech3', 4.4], cryo: ['enemy_large', 4.4], hive: ['robot_flying_gun', 3.6], eye: ['enemy_flying', 3.4], null: ['mech4', 4.2] }[b.id];
+    if (window.AS && AS.ready && BM && AS.gltf[BM[0]]) { const T3 = THREE, g = new T3.Group(), body = new T3.Group(); g.add(body); g.userData.body = body; const ch = AS.char(BM[0], BM[1], b.col); body.add(ch); g.userData.char = ch; const l = new T3.PointLight(this.C(b.col), 1.4, 9, 2); l.position.set(0, BM[1] * 0.6, 1.2); g.add(l); const sh = new T3.Mesh(this.discGeo, new T3.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0.5, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.scale.set(b.r / TS * 1.4, b.r / TS * 1.4, 1); sh.position.y = 0.012; g.add(sh); return g; }
     const T3 = THREE, g = new T3.Group(), col = b.col, m = this.M(col, { e: 0.5 }), gl = this.M(col, { basic: 1 }), r = b.r / TS * 1.1;
     const add = (geo, mat, y) => { const o = new T3.Mesh(geo, mat || m); o.position.y = y; g.add(o); return o; };
     if (b.id === 'firewall') { g.userData.a = add(new T3.CylinderGeometry(r, r * 1.1, r * 1.3, 6), m, r * 0.65); g.userData.b = add(new T3.TorusGeometry(r * 1.3, 0.06, 8, 40), gl, r * 0.8); g.userData.b.rotation.x = Math.PI / 2; g.userData.c = add(new T3.TorusGeometry(r * 0.8, 0.05, 8, 30), gl, r * 1.5); }
@@ -333,21 +365,24 @@ const R3 = {
     const T3 = THREE, lv = G.lv, pal = G.pal;
     if (this.lvG) { this.scene.remove(this.lvG); this.lvG.traverse(o => { if (o.geometry && o.geometry !== this.discGeo && o.geometry !== this.planeGeo && o.geometry !== this.ringGeo) o.geometry.dispose && o.geometry.dispose(); }); }
     const grp = this.lvG = new T3.Group(); this.scene.add(grp);
-    this.scene.fog.color.set(0x020108);
+    this.scene.fog.color.set(0x05060a); const TP = this.TP = !!(window.AS && AS.ready); const BT = TP ? (AS.BIO[lv.biome.id] || AS.BIO.grid) : null; this.lampPos = [];
     // пол (текстура из 2D-рендера пола)
     const fs = Math.min(24, Math.floor(2048 / lv.W)); const fc = this.floorCv = this.floorCv || document.createElement('canvas'); fc.width = lv.W * fs; fc.height = lv.H * fs; this.fs = fs;
     fc.getContext('2d').drawImage(G.mapCv, 0, 0, fc.width, fc.height);
     this.ftex = new T3.CanvasTexture(fc); this.ftex.anisotropy = 4;
-    const floor = new T3.Mesh(new T3.PlaneGeometry(lv.W, lv.H), new T3.MeshLambertMaterial({ map: this.ftex, emissive: 0xffffff, emissiveMap: this.ftex, emissiveIntensity: 0.42 }));
+    const floor = new T3.Mesh(new T3.PlaneGeometry(lv.W, lv.H), TP ? (() => { const m = AS.mat(BT[0], +(lv.W / 2.2).toFixed(2), null, null, +(lv.H / 2.2).toFixed(2)).clone(); m.emissive = new T3.Color(0xffffff); m.emissiveMap = this.ftex; m.emissiveIntensity = 0.16; this.ftex.encoding = T3.sRGBEncoding; return m; })() : new T3.MeshLambertMaterial({ map: this.ftex, emissive: 0xffffff, emissiveMap: this.ftex, emissiveIntensity: 0.42 }));
+    floor.receiveShadow = true;
     floor.rotation.x = -Math.PI / 2; floor.position.set(lv.W / 2, 0, lv.H / 2); grp.add(floor);
     const out = new T3.Mesh(new T3.PlaneGeometry(lv.W + 80, lv.H + 80), new T3.MeshLambertMaterial({ color: this.C(pal.wall).clone().multiplyScalar(0.35), emissive: this.C(pal.wall).clone().multiplyScalar(0.25) })); out.rotation.x = -Math.PI / 2; out.position.set(lv.W / 2, -0.02, lv.H / 2); grp.add(out);
     // стены и объекты
-    const WH = 1.25, cnt = { w: 0, p: 0, c: 0, b: 0 }, at = (x, y) => (x < 0 || y < 0 || x >= lv.W || y >= lv.H) ? 1 : lv.t[y * lv.W + x];
+    const WH = TP ? 3.0 : 1.25, cnt = { w: 0, p: 0, c: 0, b: 0 }, at = (x, y) => (x < 0 || y < 0 || x >= lv.W || y >= lv.H) ? 1 : lv.t[y * lv.W + x];
     const open = (x, y) => { const v = at(x, y); return v === 0 || v === 3 || v === 6 || v === 4; };
     for (let i = 0; i < lv.t.length; i++) { const v = lv.t[i]; if (v === 1 || v === 2) cnt.w++; else if (v === 5) cnt.p++; else if (v === 3) cnt.c++; else if (v === 6) cnt.b++; }
     const wallMat = new T3.MeshLambertMaterial({ color: this.C(pal.wall).clone().lerp(this.C(pal.edge), 0.35).lerp(this.C('#ffffff'), 0.12), emissive: this.C(pal.wall).clone().lerp(this.C(pal.edge), 0.2), emissiveIntensity: 0.8 });
-    this.iWall = new T3.InstancedMesh(new T3.BoxGeometry(1, WH, 1), wallMat, Math.max(1, cnt.w)); this.iWall.count = 0;
-    this.iPil = new T3.InstancedMesh(new T3.CylinderGeometry(0.34, 0.4, 1.5, 6), new T3.MeshLambertMaterial({ color: this.C(pal.wall), emissive: this.C(pal.edge), emissiveIntensity: 0.25 }), Math.max(1, cnt.p)); this.iPil.count = 0;
+    const wGeo = new T3.BoxGeometry(1, WH, 1); if (TP) { const uv = wGeo.attributes.uv; for (let f = 0; f < 6; f++) { if (f === 2 || f === 3) continue; for (let v = 0; v < 4; v++) { const i = f * 4 + v; uv.setXY(i, uv.getX(i) * 0.5, uv.getY(i) * WH * 0.5); } } }
+    const wMatTP = TP ? AS.mat(BT[1], 1, lv.biome.id === 'frost' ? '#d8ecff' : null) : null;
+    this.iWall = new T3.InstancedMesh(wGeo, TP ? wMatTP : wallMat, Math.max(1, cnt.w)); this.iWall.instanceColor = new T3.InstancedBufferAttribute(new Float32Array(Math.max(1, cnt.w) * 3).fill(1), 3); this.iWall.count = 0; this.iWall.castShadow = TP; this.iWall.receiveShadow = TP;
+    this.iPil = new T3.InstancedMesh(TP ? new T3.CylinderGeometry(0.36, 0.42, WH, 12) : new T3.CylinderGeometry(0.34, 0.4, 1.5, 6), TP ? wMatTP.clone() : new T3.MeshLambertMaterial({ color: this.C(pal.wall), emissive: this.C(pal.edge), emissiveIntensity: 0.25 }), Math.max(1, cnt.p)); this.iPil.count = 0; this.iPil.castShadow = TP;
     this.iCrate = new T3.InstancedMesh(new T3.BoxGeometry(0.8, 0.8, 0.8), new T3.MeshLambertMaterial({ color: 0x7a6040, emissive: 0x3a2a14, emissiveIntensity: 0.6 }), Math.max(1, cnt.c)); this.iCrate.count = 0;
     this.iBar = new T3.InstancedMesh(new T3.CylinderGeometry(0.28, 0.28, 0.75, 14), new T3.MeshLambertMaterial({ color: 0x400810, emissive: 0xff2a45, emissiveIntensity: 0.7 }), Math.max(1, cnt.b)); this.iBar.count = 0;
     this.tileInst = {}; const d = this.dummy;
@@ -356,14 +391,15 @@ const R3 = {
       const i = y * lv.W + x, v = lv.t[i];
       if (v === 1 || v === 2) {
         const near = open(x - 1, y) || open(x + 1, y) || open(x, y - 1) || open(x, y + 1) || open(x - 1, y - 1) || open(x + 1, y + 1) || open(x - 1, y + 1) || open(x + 1, y - 1);
-        const h = near ? WH : 0.9;
+        const h = near || TP ? WH : 0.9;
         d.position.set(x + 0.5, h / 2, y + 0.5); d.scale.set(1, h / WH, 1); d.rotation.set(0, 0, 0); d.updateMatrix();
-        const k = this.iWall.count++; this.iWall.setMatrixAt(k, d.matrix); this.iWall.setColorAt(k, v === 2 ? colC : (near ? colW : this.C('#06040e'))); this.tileInst[i] = ['w', k];
-      } else if (v === 5) { d.position.set(x + 0.5, 0.75, y + 0.5); d.scale.set(1, 1, 1); d.rotation.set(0, 0.3, 0); d.updateMatrix(); const k = this.iPil.count++; this.iPil.setMatrixAt(k, d.matrix); this.tileInst[i] = ['p', k]; }
+        const k = this.iWall.count++; this.iWall.setMatrixAt(k, d.matrix); this.iWall.setColorAt(k, TP ? (v === 2 ? this.C('#8a7860') : this.C('#ffffff')) : v === 2 ? colC : (near ? colW : this.C('#06040e'))); this.tileInst[i] = ['w', k];
+      } else if (v === 5) { d.position.set(x + 0.5, TP ? WH / 2 : 0.75, y + 0.5); d.scale.set(1, 1, 1); d.rotation.set(0, 0.3, 0); d.updateMatrix(); const k = this.iPil.count++; this.iPil.setMatrixAt(k, d.matrix); this.tileInst[i] = ['p', k]; }
       else if (v === 3) { d.position.set(x + 0.5, 0.4, y + 0.5); d.scale.set(1, 1, 1); d.rotation.set(0, ((x * 7 + y * 3) % 5) * 0.12, 0); d.updateMatrix(); const k = this.iCrate.count++; this.iCrate.setMatrixAt(k, d.matrix); this.tileInst[i] = ['c', k]; }
       else if (v === 6) { d.position.set(x + 0.5, 0.375, y + 0.5); d.scale.set(1, 1, 1); d.rotation.set(0, 0, 0); d.updateMatrix(); const k = this.iBar.count++; this.iBar.setMatrixAt(k, d.matrix); this.tileInst[i] = ['b', k]; }
     }
     [this.iWall, this.iPil, this.iCrate, this.iBar].forEach(m => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; grp.add(m); });
+    this.crateP = this.barP = null; if (TP) this.buildTP(G, grp, at, open, WH);
     // каркас ящиков и колец бочек
     this.WH = WH; this.buildEdges();
     // кусты
@@ -389,6 +425,7 @@ const R3 = {
       if (v === 1) { const near = open(x - 1, y) || open(x + 1, y) || open(x, y - 1) || open(x, y + 1); if (!near) continue; if (h < 22) decW.push([x, y, h]); else if (h < 30) decL.push([x + 0.5, y + 0.5]); }
       else if (v === 0) { if (h < 5) decF.push([x, y, h]); else if (h < 8 && (at(x - 1, y) === 1 || at(x + 1, y) === 1 || at(x, y - 1) === 1 || at(x, y + 1) === 1)) decC.push([x, y, h]); }
     }
+    if (TP) { decW.length = 0; decL.length = 0; decF.length = 0; decC.length = 0; }
     const IM = (geo, mat, list, fn) => { const m = new T3.InstancedMesh(geo, mat, Math.max(1, list.length)); m.count = 0; list.forEach(a => { fn(a); d.updateMatrix(); m.setMatrixAt(m.count++, d.matrix); }); m.instanceMatrix.needsUpdate = true; grp.add(m); return m; };
     const wcol = this.C(pal.wall).clone().lerp(this.C('#ffffff'), 0.08);
     IM(new T3.BoxGeometry(0.5, 0.16, 0.5), new T3.MeshLambertMaterial({ color: wcol, emissive: this.C(pal.wall), emissiveIntensity: 0.5 }), decW, ([x, y, h]) => { d.position.set(x + 0.5, WH + 0.08, y + 0.5); d.rotation.set(0, (h % 4) * 0.4, 0); d.scale.set(1, 1, 1); });
@@ -397,7 +434,7 @@ const R3 = {
     this.lamps = decL;
     IM(new T3.BoxGeometry(0.9, 0.02, 0.9), new T3.MeshLambertMaterial({ color: 0x0a0a18, emissive: this.C(pal.edge), emissiveIntensity: 0.18 }), decF, ([x, y]) => { d.position.set(x + 0.5, 0.012, y + 0.5); d.rotation.set(0, 0, 0); d.scale.set(1, 1, 1); });
     IM(new T3.CylinderGeometry(0.035, 0.035, 0.9, 6), new T3.MeshLambertMaterial({ color: 0x111122, emissive: this.C(pal.edge), emissiveIntensity: 0.15 }), decC, ([x, y, h]) => { d.position.set(x + 0.5, 0.04, y + 0.5); d.rotation.set(0, 0, Math.PI / 2); d.rotation.y = (h % 2) * Math.PI / 2; d.scale.set(1, 1, 1); });
-    this.biomeDeco(lv, grp, at, open, WH);
+    if (!TP) this.biomeDeco(lv, grp, at, open, WH); else this.bfx = lv.biome.id === 'frost' ? [['snow']] : [];
     // терминалы взлома
     this.termG = (lv.terms || []).map(tm => {
       const o = new T3.Group(); o.position.set(tm.x / TS, 0, tm.y / TS); grp.add(o);
@@ -440,10 +477,40 @@ const R3 = {
   },
   breakTile(i) {
     const ti = this.tileInst && this.tileInst[i]; if (!ti) return;
+    if (ti[0] === 'c' && this.crateP) this.crateP.userData.hide(ti[1]); if (ti[0] === 'b' && this.barP) this.barP.userData.hide(ti[1]);
     const m = { w: this.iWall, p: this.iPil, c: this.iCrate, b: this.iBar }[ti[0]];
     this.dummy.position.set(0, -50, 0); this.dummy.scale.set(0.001, 0.001, 0.001); this.dummy.updateMatrix(); m.setMatrixAt(ti[1], this.dummy.matrix); m.instanceMatrix.needsUpdate = true;
     delete this.tileInst[i]; if (ti[0] === 'w') this.buildEdges();
     if (this.floorCv) { this.floorCv.getContext('2d').drawImage(G.mapCv, 0, 0, this.floorCv.width, this.floorCv.height); this.ftex.needsUpdate = true; }
+  },
+  /* ---------- реалистичный мир из CC0-ассетов ---------- */
+  buildTP(G, grp, at, open, WH) {
+    const T3 = THREE, lv = G.lv, id = lv.biome.id, hs = (x, y, k) => ((x * 2654435761) ^ (y * 40503) ^ (k * 97531)) >>> 0;
+    const crates = [], bars = [];
+    for (const i in this.tileInst) { const t = this.tileInst[i], x = i % lv.W, y = (i / lv.W) | 0; if (t[0] === 'c') crates[t[1]] = [x, y]; if (t[0] === 'b') bars[t[1]] = [x, y]; }
+    this.crateP = AS.inst('old_military_crate', crates, 0.7, (d, a) => { d.position.set(a[0] + 0.5, 0, a[1] + 0.5); d.rotation.y = (hs(a[0], a[1], 3) % 4) * Math.PI / 2 + ((hs(a[0], a[1], 4) % 10) - 5) * 0.04; }, 0.95); if (this.crateP) { grp.add(this.crateP); this.iCrate.visible = false; }
+    this.barP = AS.inst('Barrel_01', bars, 1.0, (d, a) => { d.position.set(a[0] + 0.5, 0, a[1] + 0.5); d.rotation.y = hs(a[0], a[1], 5) % 6; }, 0.8); if (this.barP) { grp.add(this.barP); this.iBar.visible = false; }
+    // потолок с панелями света
+    const cm = AS.mat(id === 'station' || id === 'circuit' ? 'blue_metal_plate' : 'metal_plate_02', lv.W / 2, '#55565e', null, lv.H / 2);
+    const ceil = new T3.Mesh(new T3.PlaneGeometry(lv.W, lv.H), cm); ceil.rotation.x = Math.PI / 2; ceil.position.set(lv.W / 2, WH, lv.H / 2); grp.add(ceil);
+    const LC = { factory: '#ffcf8a', lab: '#e8fff8', city: '#ff9ad8', frost: '#cfe8ff', station: '#bcd4ff', core: '#ff8a70' }[id] || '#d8dcff';
+    const pan = [], lamps = [], wallD = [];
+    for (let y = 1; y < lv.H - 1; y++) for (let x = 1; x < lv.W - 1; x++) {
+      if (at(x, y) !== 0) continue; const h = hs(x, y, 1) % 1000;
+      if (x % 4 === 2 && y % 4 === 2) { if (h % 3) pan.push([x, y]); else lamps.push([x, y]); }
+      let side = null; if (at(x, y - 1) === 1) side = 'n'; else if (at(x, y + 1) === 1) side = 's'; else if (at(x - 1, y) === 1) side = 'w'; else if (at(x + 1, y) === 1) side = 'e';
+      if (side && !lv.bush[y * lv.W + x]) wallD.push([x, y, h, side]);
+    }
+    const ip = new T3.InstancedMesh(new T3.BoxGeometry(1.4, 0.05, 0.28), new T3.MeshBasicMaterial({ color: this.C(LC).clone().multiplyScalar(1.6) }), Math.max(1, pan.length)); const d = this.dummy; ip.count = 0; pan.forEach(([x, y]) => { d.position.set(x + 0.5, WH - 0.03, y + 0.5); d.rotation.set(0, (x + y) % 8 ? 0 : Math.PI / 2, 0); d.scale.set(1, 1, 1); d.updateMatrix(); ip.setMatrixAt(ip.count++, d.matrix); }); ip.instanceMatrix.needsUpdate = true; grp.add(ip);
+    const mob = this.lvl >= 1, HEAVY = { hanging_industrial_lamp: 1, power_box_01: 1, propane_tank: 1, metal_trash_can: 1, modular_industrial_pipes_01: 1, street_lamp_01: 1 };
+    const lp = mob ? null : AS.inst('hanging_industrial_lamp', lamps, 0.9, (dd, a) => { dd.position.set(a[0] + 0.5, WH - 0.9, a[1] + 0.5); }); if (lp) grp.add(lp);
+    this.lampPos = lamps.map(([x, y]) => [x + 0.5, WH - 0.95, y + 0.5]).concat(pan.filter((a, i) => i % 3 === 0).map(([x, y]) => [x + 0.5, WH - 0.2, y + 0.5])); this.lampCol = LC;
+    // декор вдоль стен (у каждого биома свой набор)
+    const SETS = { factory: [['worn_metal_rack', 2.0], ['propane_tank', 1.1], ['industrial_pastic_container', 0.9], ['Barrel_01', 1.0], ['utility_box_01', 0.9]], lab: [['utility_box_01', 1.0], ['power_box_01', 0.7, 1.3], ['metal_trash_can', 0.8], ['worn_metal_rack', 1.9]], city: [['street_lamp_01', 3.0], ['metal_trash_can', 0.85], ['industrial_pastic_container', 0.9], ['power_box_01', 0.7, 1.2]], frost: [['propane_tank', 1.1], ['industrial_pastic_container', 0.9], ['worn_metal_rack', 2.0]], station: [['power_box_01', 0.7, 1.3], ['utility_box_01', 1.0], ['worn_metal_rack', 2.0], ['metal_trash_can', 0.8]] };
+    const set = SETS[id] || [['utility_box_01', 0.9], ['power_box_01', 0.7, 1.3], ['worn_metal_rack', 2.0], ['metal_trash_can', 0.8], ['propane_tank', 1.1]];
+    const rotOf = s => s === 'n' ? 0 : s === 's' ? Math.PI : s === 'w' ? Math.PI / 2 : -Math.PI / 2, offOf = s => s === 'n' ? [0, -0.28] : s === 's' ? [0, 0.28] : s === 'w' ? [-0.28, 0] : [0.28, 0];
+    set.forEach(([pid, h, yy], k) => { if (mob && HEAVY[pid]) return; const L = wallD.filter(a => a[2] % 100 >= k * 5 && a[2] % 100 < k * 5 + 4); const m = AS.inst(pid, L, h, (dd, a) => { const o = offOf(a[3]); dd.position.set(a[0] + 0.5 + o[0], yy || 0, a[1] + 0.5 + o[1]); dd.rotation.y = rotOf(a[3]); }, pid === 'street_lamp_01' ? 1.2 : 0.95); if (m) grp.add(m); });
+    const pipes = mob ? [] : wallD.filter(a => a[2] % 100 >= 60 && a[2] % 100 < 64); const pm = AS.inst('modular_industrial_pipes_01', pipes, 0.6, (dd, a) => { const o = offOf(a[3]); dd.position.set(a[0] + 0.5 + o[0] * 1.5, 2.1, a[1] + 0.5 + o[1] * 1.5); dd.rotation.y = rotOf(a[3]) + Math.PI / 2; }); if (pm) grp.add(pm);
   },
   /* ---------- уникальная архитектура биомов ---------- */
   biomeDeco(lv, grp, at, open, WH) {
@@ -571,16 +638,38 @@ const R3 = {
     const asp = innerWidth / innerHeight; this.zoomK = (this.zoomK || 1) + (((G.intro && G.boss) ? 0.55 : 1) - (this.zoomK || 1)) * Math.min(1, dt * 2); const D = Math.max(13 / asp, 10.5) * (G.lv.arena ? 1.3 : 1) * this.zoomK, el = 0.92;
     const foc = G.intro && G.boss, tx = foc ? G.boss.x / TS : px, tz = Math.min(lv.H - 6, foc ? G.boss.y / TS + 1 : pz), ck = foc ? 2.5 : 7; this.ct = this.ct || { x: px, z: pz }; this.ct.x += (tx - this.ct.x) * Math.min(1, dt * ck); this.ct.z += (tz - this.ct.z) * Math.min(1, dt * ck);
     const sh = (G.shk || 0) / TS;
-    this.cam.position.set(this.ct.x + (Math.random() - 0.5) * sh, Math.sin(el) * D, this.ct.z - 1.4 + Math.cos(el) * D + (Math.random() - 0.5) * sh);
-    this.cam.lookAt(this.ct.x, 0, this.ct.z - 1.4);
-    this.scene.fog.near = D * 0.9; this.scene.fog.far = D * 2.2;
-    const vis = (x, z, m = 3) => Math.abs(x - this.ct.x) < D * 0.75 * Math.max(1, asp) + m && Math.abs(z - this.ct.z) < D * 0.9 + m;
+    let vis;
+    if (this.TP) {
+      // камера из-за плеча с отталкиванием от стен
+      const yaw = G.yaw || 0, fx = Math.cos(yaw), fz = Math.sin(yaw), want = (foc ? 6.5 : asp < 0.8 ? 6.4 : 4.8) * (G.lv.arena && !foc ? 1.2 : 1), hh = foc ? 3.2 : asp < 0.8 ? 3.0 : 2.55;
+      const cx0 = foc ? G.boss.x / TS : px, cz0 = foc ? G.boss.y / TS : pz, side = foc || asp < 0.8 ? 0 : 0.55;
+      const ox = cx0 - fz * side * 1.15, oz = cz0 + fx * side * 1.15; let dist = want;
+      for (let t = 0.3; t <= want; t += 0.15) { const x = ox - fx * t, z = oz - fz * t, v = (x < 0 || z < 0 || x >= lv.W || z >= lv.H) ? 1 : lv.t[Math.floor(z) * lv.W + Math.floor(x)]; if (v === 1 || v === 2 || v === 5) { dist = Math.max(0.6, t - 0.25); break; } }
+      this.cd = this.cd === undefined ? dist : this.cd + (dist - this.cd) * Math.min(1, dt * (dist < this.cd ? 18 : 4));
+      this.ct.x += (ox - this.ct.x) * Math.min(1, dt * 12); this.ct.z += (oz - this.ct.z) * Math.min(1, dt * 12);
+      this.cam.fov = asp < 0.8 ? 72 : 62; this.cam.updateProjectionMatrix();
+      const lift = Math.max(0, want - this.cd) * 0.45;
+      this.cam.position.set(this.ct.x - fx * this.cd + (Math.random() - 0.5) * sh, Math.min(2.88, hh + lift) + (Math.random() - 0.5) * sh, this.ct.z - fz * this.cd);
+      this.cam.lookAt(this.ct.x + fx * 4, asp < 0.8 ? 0.85 : 1.35, this.ct.z + fz * 4);
+      this.scene.fog.near = 9; this.scene.fog.far = 34;
+      vis = (x, z, m = 3) => { const dx = x - px, dz = z - pz; return dx * dx + dz * dz < (26 + m) * (26 + m); };
+      this.sun.position.set(px - 5, 14, pz + 4); this.sun.target.position.set(px, 0, pz); this.sun.target.updateMatrixWorld();
+      // 4 ближайших лампы дают настоящий свет
+      const L = (this.lampPos || []).map(a => [a, (a[0] - px) ** 2 + (a[2] - pz) ** 2]).sort((a, b) => a[1] - b[1]);
+      this.lampL.forEach((l, i) => { const a = L[i]; if (a && a[1] < 300) { l.position.set(a[0][0], a[0][1], a[0][2]); l.color.copy(this.C(this.lampCol || '#ffd9a0')); l.intensity = 1.6 * (1 - a[1] / 300) * (G.dyn && G.dyn.id === 'blackout' ? 0.1 : 1); } else l.intensity = 0; });
+    } else {
+      this.cam.position.set(this.ct.x + (Math.random() - 0.5) * sh, Math.sin(el) * D, this.ct.z - 1.4 + Math.cos(el) * D + (Math.random() - 0.5) * sh);
+      this.cam.lookAt(this.ct.x, 0, this.ct.z - 1.4);
+      this.scene.fog.near = D * 0.9; this.scene.fog.far = D * 2.2;
+      vis = (x, z, m = 3) => Math.abs(x - this.ct.x) < D * 0.75 * Math.max(1, asp) + m && Math.abs(z - this.ct.z) < D * 0.9 + m;
+    }
     // игрок
     const sk = P.cos('skin').v;
     if (!this.heroG || this.lastSkin !== sk + cs.hero.id) { if (this.heroG) this.lvG.remove(this.heroG); this.heroG = this.heroModel(cs.hero, sk); this.lvG.add(this.heroG); this.lastSkin = sk + cs.hero.id; }
     const hg = this.heroG, moving = (G.moveVec().x || G.moveVec().y);
     hg.position.set(px, moving ? Math.abs(Math.sin(T * 12)) * 0.06 : 0, pz);
     hg.userData.piv.rotation.y = -p.ang; hg.userData.base.rotation.z = T * 2; this.animHero(hg, T);
+    if (hg.userData.char) { hg.position.y = 0; const ch = hg.userData.char; AS.play(ch, G.state === 'dying' ? ['Death'] : (p.shotT > 0 ? (moving ? ['Run_Gun_Shoot', 'Shoot_Small', 'Run_Gun', 'Running', 'Run'] : ['Run_Gun_Shoot', 'Shoot_Small', 'Shoot', 'Punch', 'Idle_Gun']) : moving ? ['Run_Gun', 'Run', 'Running', 'Walk'] : ['Idle_Gun', 'Idle']), 0.15, G.state === 'dying'); ch.userData.mixer.update(dt); }
     if (sk === 'glitch') hg.userData.piv.position.x = (Math.random() < 0.08 ? (Math.random() - 0.5) * 0.12 : 0);
     hg.visible = G.state !== 'dying' && !(p.inv > 0 && p.dashT <= 0 && Math.floor(T * 20) % 2);
     this.pl.position.set(px, 3, pz + 1); this.pl.color.copy(this.C(cs.hero.col)); this.gp(px, 0.1, pz, cs.hero.col, 1.6, G.hidden ? 0.15 : 0.35);
@@ -599,7 +688,9 @@ const R3 = {
       if (e.elite) { this.ring(ex, ez, m.userData.r * 2.2, '#ffd23d', 0.6 + Math.sin(T * 5) * 0.25, 0.05); this.gp(ex, m.userData.r * 2.6, ez, '#ffd23d', 1.2, 0.9); for (let k = 0; k < 3; k++) { const a = T * 3 + k * 2.1; this.gp(ex + Math.cos(a) * m.userData.r * 1.8, 0.3 + k * 0.3, ez + Math.sin(a) * m.userData.r * 1.8, '#ffe27a', 0.35, 1); } }
       if (e.shd > 0) this.ring(ex, ez, m.userData.r * 1.4, '#4da6ff', 0.55, 0.4);
       if (m.userData.threat) { m.userData.threat.rotation.y = T * 1.5; m.userData.threat.children[0].material.opacity = 0.55 + Math.sin(T * 6 + e.t) * 0.3; }
-      if (e.type !== 'turret' && e.type !== 'drone') { b.position.y = Math.abs(Math.sin(T * 8 + e.t * 3)) * 0.08; b.scale.y = 1 + Math.sin(T * 16 + e.t * 3) * 0.06; }
+      if (m.userData.char) { b.rotation.set(0, Math.PI / 2 - pa, 0); b.position.y = 0; const ch = m.userData.char, dd = Math.hypot(e.x - p.x, e.y - p.y), mv = Math.hypot(e.x - (e.lx || e.x), e.y - (e.ly || e.y)) > 0.3; e.lx = e.x; e.ly = e.y;
+        AS.play(ch, (e.ai === 'turret' || e.ai === 'sniper' || e.ai === 'kite') && e.cd < 0.4 ? ['Shoot', 'Shoot_Small', 'Attack', 'Punch'] : dd < e.r + 40 ? ['Attack', 'Punch', 'Headbutt'] : mv ? (e.st === 2 ? ['Run', 'Fast_Flying', 'Walk'] : ['Walk', 'Run', 'Fast_Flying', 'Flying_Idle']) : ['Idle', 'Flying_Idle']); if (dd < 900) ch.userData.mixer.update(dt * (e.fz > 0 ? 0.35 : 1)); }
+      else if (e.type !== 'turret' && e.type !== 'drone') { b.position.y = Math.abs(Math.sin(T * 8 + e.t * 3)) * 0.08; b.scale.y = 1 + Math.sin(T * 16 + e.t * 3) * 0.06; }
       const fl = e.flash > 0; m.scale.setScalar(fl ? 1.15 : (e.ai === 'bomb' && e.st === 1 ? 1 + Math.abs(Math.sin(T * 20)) * 0.25 : 1));
       this.gp(ex, 0.4, ez, fl ? '#ffffff' : e.fz > 0 ? '#9ff' : e.col, m.userData.r * 3, fl ? 0.8 : 0.3);
       if (e.ai === 'charge' && e.st === 1) this.plane(ex + e.cx * 1.3, ez + e.cy * 1.3, 0.5, 2.6, Math.atan2(e.cy, e.cx), '#ffffff', 0.25);
@@ -614,10 +705,11 @@ const R3 = {
       bg.scale.setScalar(B.flash > 0 ? 1.08 : 1);
       if (u.a) u.a.rotation.y = T * (B.st === 2 ? 14 : 1); if (u.b) u.b.rotation.z = T * 1.5; if (u.c) u.c.rotation.y = -T * 2;
       if (B.id === 'serpent') bg.rotation.y = -B.a;
-      if (B.id === 'crusher') { const r = B.r / TS * 1.1; u.press.position.y = r * 2.6 - (B.squash || 0) * r * 1.2; (u.gears || []).forEach(q => q.rotation.y = T * 3); u.body.rotation.y = -Math.atan2(p.y - B.y, p.x - B.x); }
-      if (B.id === 'cryo') { u.crown.rotation.y = T; bg.position.y = 0.3 + Math.sin(T * 1.5) * 0.15; for (let k = 0; k < 3; k++) this.gp(bx + (Math.random() - 0.5) * 3, Math.random() * 2, bz + (Math.random() - 0.5) * 3, '#cfefff', 0.2, 0.8); }
+      if (u.char) { const pa = Math.atan2(p.y - B.y, p.x - B.x); u.body.rotation.set(0, Math.PI / 2 - pa, 0); const mv = Math.hypot(B.x - (u.lx || B.x), B.y - (u.ly || B.y)) > 0.4; u.lx = B.x; u.ly = B.y; AS.play(u.char, G.intro ? ['Hello', 'Wave', 'Yes', 'Idle', 'Flying_Idle'] : B.cd < 0.35 || B.cd2 < 0.35 ? ['Shoot_Big', 'Shoot', 'Attack', 'Punch', 'Headbutt'] : mv ? ['Run', 'Walk', 'Fast_Flying'] : ['Idle', 'Flying_Idle']); u.char.userData.mixer.update(dt); }
+      if (B.id === 'crusher' && u.press) { const r = B.r / TS * 1.1; u.press.position.y = r * 2.6 - (B.squash || 0) * r * 1.2; (u.gears || []).forEach(q => q.rotation.y = T * 3); u.body.rotation.y = -Math.atan2(p.y - B.y, p.x - B.x); }
+      if (B.id === 'cryo') { if (u.crown) u.crown.rotation.y = T; bg.position.y = 0.3 + Math.sin(T * 1.5) * 0.15; for (let k = 0; k < 3; k++) this.gp(bx + (Math.random() - 0.5) * 3, Math.random() * 2, bz + (Math.random() - 0.5) * 3, '#cfefff', 0.2, 0.8); }
       if (B.id === 'hive') { bg.position.y = 0.4 + Math.sin(T * 2) * 0.2; if (B.armor < 1) this.ring(bx, bz, B.r / TS + 1.1, '#6aa8ff', 0.25, 1.2, true); }
-      if (u.iris) { const pa = Math.atan2(p.y - B.y, p.x - B.x), r = B.r / TS * 1.1; u.iris.position.x = Math.cos(pa) * r * 0.65; u.iris.position.z = Math.sin(pa) * r * 0.65; u.pu.position.x = Math.cos(pa) * r * 0.95; u.pu.position.z = Math.sin(pa) * r * 0.95; u.ring.rotation.x = T; u.ring.rotation.y = T * 0.7; }
+      if (u.iris && u.ring) { const pa = Math.atan2(p.y - B.y, p.x - B.x), r = B.r / TS * 1.1; u.iris.position.x = Math.cos(pa) * r * 0.65; u.iris.position.z = Math.sin(pa) * r * 0.65; u.pu.position.x = Math.cos(pa) * r * 0.95; u.pu.position.z = Math.sin(pa) * r * 0.95; u.ring.rotation.x = T; u.ring.rotation.y = T * 0.7; }
       this.gp(bx, 1, bz, B.col, 4, 0.45);
       if (B.segs.length) { while (this.segG.length < B.segs.length) { const s = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), this.M(B.col, { e: 0.4 })); this.lvG.add(s); this.segG.push(s); } B.segs.forEach((s, i) => { const o = this.segG[i], r = s.r / TS * 1.1; o.position.set(s.x / TS, r, s.y / TS); o.scale.setScalar(r); }); }
       if (B.las) for (const l of B.las) this.laser(l[0] / TS, l[1] / TS, l[2] / TS, l[3] / TS, '#ff2a5a', 0.16, 0.6);
@@ -743,13 +835,13 @@ const R3 = {
     for (const a of G.amb || []) { const x = this.ct.x + (a.x - 0.5) * D * 1.6, z = this.ct.z + (a.y - 0.5) * D * 1.4, y = ((a.ph + T * a.v * 0.05) % 3); this.gp(x, y, z, G.pal.edge, 0.12 * a.s, 0.5); }
     // прицел
     let aimOn = false;
-    for (const id in G.touches) { const o = G.touches[id]; if ((o.role === 'atk' || o.role === 'atk2' || o.role === 'sup') && Math.hypot(o.x - o.ox, o.y - o.oy) > 18) { aimOn = true; const a = Math.atan2(o.y - o.oy, o.x - o.ox), L = (o.role === 'sup' ? 260 : cs.range) / TS; this.aim.material.color.copy(this.C(o.role === 'sup' ? '#ffd23d' : '#ffffff')); if (cs.hero.atk.t === 'wave' && o.role !== 'sup') { this.aimArc.visible = true; this.aimArc.position.set(px, 0.05, pz); this.aimArc.scale.set(L, L, 1); this.aimArc.rotation.set(-Math.PI / 2, 0, -a); this.aim.visible = false; } else { this.aim.visible = true; this.aimArc.visible = false; this.aim.position.set(px + Math.cos(a) * L / 2, 0.05, pz + Math.sin(a) * L / 2); this.aim.scale.set(L, 0.38, 1); this.aim.rotation.set(-Math.PI / 2, 0, -a); } } }
+    if (!this.TP) for (const id in G.touches) { const o = G.touches[id]; if ((o.role === 'atk' || o.role === 'atk2' || o.role === 'sup') && Math.hypot(o.x - o.ox, o.y - o.oy) > 18) { aimOn = true; const a = Math.atan2(o.y - o.oy, o.x - o.ox), L = (o.role === 'sup' ? 260 : cs.range) / TS; this.aim.material.color.copy(this.C(o.role === 'sup' ? '#ffd23d' : '#ffffff')); if (cs.hero.atk.t === 'wave' && o.role !== 'sup') { this.aimArc.visible = true; this.aimArc.position.set(px, 0.05, pz); this.aimArc.scale.set(L, L, 1); this.aimArc.rotation.set(-Math.PI / 2, 0, -a); this.aim.visible = false; } else { this.aim.visible = true; this.aimArc.visible = false; this.aim.position.set(px + Math.cos(a) * L / 2, 0.05, pz + Math.sin(a) * L / 2); this.aim.scale.set(L, 0.38, 1); this.aim.rotation.set(-Math.PI / 2, 0, -a); } } }
     if (!aimOn) { this.aim.visible = false; this.aimArc.visible = false; }
     // финал
     this.endPools();
     const g = this.pts.geometry; g.setDrawRange(0, this.pn);
     for (const k of ['position', 'color', 'size', 'alpha']) g.attributes[k].needsUpdate = true;
-    this.r.render(this.scene, this.cam);
+    if (this.composer && this.lvl === 0 && this.TP) this.composer.render(); else this.r.render(this.scene, this.cam);
   },
 
   /* ---------- лобби: 3D-боец на постаменте ---------- */
@@ -758,7 +850,7 @@ const R3 = {
     const T3 = THREE;
     if (!this.lr) {
       this.lcv = document.createElement('canvas');
-      this.lr = new T3.WebGLRenderer({ canvas: this.lcv, antialias: true, alpha: true, preserveDrawingBuffer: true }); this.lr.setClearColor(0, 0);
+      this.lr = new T3.WebGLRenderer({ canvas: this.lcv, antialias: true, alpha: true, preserveDrawingBuffer: true }); this.lr.setClearColor(0, 0); this.lr.outputEncoding = T3.sRGBEncoding; this.lr.toneMapping = T3.ACESFilmicToneMapping; this.lr.toneMappingExposure = 1.2;
       this.ls = new T3.Scene(); this.lc = new T3.PerspectiveCamera(32, 1, 0.1, 50); this.lc.position.set(0, 2.1, 4.6); this.lc.lookAt(0, 0.95, 0);
       this.ls.add(new T3.HemisphereLight(0x9a8cff, 0x100828, 0.9)); const dl = new T3.DirectionalLight(0xffffff, 0.7); dl.position.set(2, 4, 3); this.ls.add(dl);
       this.lpl = new T3.PointLight(0xffffff, 1.5, 6, 2); this.lpl.position.set(0, 1.5, 1.2); this.ls.add(this.lpl);
@@ -772,8 +864,8 @@ const R3 = {
       this.lhero = {};
     }
     const key = H.id + skin; if (!this.lhero[key]) { this.lhero[key] = this.heroModel(H, skin); this.lhero[key].userData.base.visible = false; }
-    for (const k in this.lhero) { if (this.lhero[k].parent) this.ls.remove(this.lhero[k]); }
-    const hm = this.lhero[key]; this.ls.add(hm); hm.scale.setScalar(1.75); hm.position.y = 0.11 + Math.sin(T * 2) * 0.05; hm.userData.piv.rotation.y = -Math.PI / 2 + Math.sin(T * 0.7) * 0.9; this.animHero(hm, T);
+    this.ls.children.filter(o => o.userData && o.userData.piv).forEach(o => this.ls.remove(o));
+    const hm = this.lhero[key]; this.ls.add(hm); hm.scale.setScalar(1.75); hm.position.y = 0.11 + Math.sin(T * 2) * 0.05; hm.userData.piv.rotation.y = -Math.PI / 2 + Math.sin(T * 0.7) * 0.9; this.animHero(hm, T); if (hm.userData.char) { const ch = hm.userData.char; AS.play(ch, ['Idle_Gun', 'Idle', 'Standing']); const ldt = Math.min(0.05, Math.max(0, T - (hm.userData.lt || T))); hm.userData.lt = T; ch.userData.mixer.update(ldt); hm.scale.setScalar(1.15); hm.userData.piv.rotation.y = -Math.PI / 2 + Math.sin(T * 0.6) * 0.6; }
     const col = this.C(lock ? '#555566' : H.col);
     this.lring.material.color.copy(col); this.lring2.material.color.copy(col); this.lbeam.material.color.copy(col); this.lpl.color.copy(col); this.lring.rotation.z = T;
     this.lparts.forEach((m, i) => { const ph = (T * 0.35 + i / 18) % 1, a = i * 2.4 + T * 0.3; m.position.set(Math.cos(a) * 0.85 * (1 - ph * 0.3), ph * 2.6, Math.sin(a) * 0.85 * (1 - ph * 0.3)); m.material.color.copy(col); m.scale.setScalar(1 - ph); });

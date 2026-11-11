@@ -60,11 +60,11 @@ const G = {
       if (e.code === 'Escape' || e.code === 'KeyP') this.pause();
     });
     addEventListener('keyup', e => { this.keys[e.code] = false; });
-    cv.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    cv.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; if (document.pointerLockElement === cv && this.state === 'play') this.yaw += e.movementX * 0.0026 * (P.s.settings.sens || 1); });
     cv.addEventListener('mousedown', e => {
-      if (this.touch) return; SFX.init();
+      if (this.touch) return; SFX.init(); if (this.isTP() && document.pointerLockElement !== cv && this.state === 'play' && cv.requestPointerLock) { try { cv.requestPointerLock(); } catch (er) { } }
       if (e.button === 0) this.mouse.down = true;
-      if (e.button === 2) { const w = this.s2w(e.clientX, e.clientY); this.doSuper(Math.atan2(w.y - this.p.y, w.x - this.p.x)); }
+      if (e.button === 2) { if (this.isTP()) this.doSuper(this.aimTP()); else { const w = this.s2w(e.clientX, e.clientY); this.doSuper(Math.atan2(w.y - this.p.y, w.x - this.p.x)); } }
     });
     addEventListener('mouseup', e => { if (e.button === 0) this.mouse.down = false; });
     cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -75,15 +75,16 @@ const G = {
         let role = null;
         if (inB(b.atk)) role = 'atk'; else if (inB(b.sup, 1.25)) role = 'sup'; else if (inB(b.dash, 1.3)) { this.dash(); continue; }
         else if (x < this.W * 0.55) role = 'move'; else role = 'atk2';
-        this.touches[t.identifier] = { role, ox: x, oy: y, x, y };
+        this.touches[t.identifier] = { role, ox: x, oy: y, x, y, lx: x, ly: y };
       }
     };
-    const tm = (e) => { e.preventDefault(); for (const t of e.changedTouches) { const o = this.touches[t.identifier]; if (o) { o.x = t.clientX; o.y = t.clientY; } } };
+    const tm = (e) => { e.preventDefault(); for (const t of e.changedTouches) { const o = this.touches[t.identifier]; if (o) { o.x = t.clientX; o.y = t.clientY; if (this.isTP() && o.role !== 'move') { this.yaw += (o.x - o.lx) * 0.0085 * (P.s.settings.sens || 1); } o.lx = o.x; o.ly = o.y; } } };
     const te = (e) => {
       e.preventDefault();
       for (const t of e.changedTouches) {
         const o = this.touches[t.identifier]; delete this.touches[t.identifier]; if (!o || this.state !== 'play') continue;
         const dx = o.x - o.ox, dy = o.y - o.oy, drag = Math.hypot(dx, dy) > 18;
+        if (this.isTP()) { if (o.role === 'atk' || (o.role === 'atk2' && !drag)) this.fire(null); if (o.role === 'sup') this.doSuper(null); continue; }
         if (o.role === 'atk' || o.role === 'atk2') this.fire(drag ? Math.atan2(dy, dx) : null);
         if (o.role === 'sup') this.doSuper(drag ? Math.atan2(dy, dx) : null);
       }
@@ -122,6 +123,9 @@ const G = {
     if (this.slowT > 0) { c.fillStyle = 'rgba(80,120,255,0.12)'; c.fillRect(0, 0, W, H); }
     if (this.hurtFlash > 0) { c.fillStyle = 'rgba(255,0,60,' + this.hurtFlash * 0.7 + ')'; c.fillRect(0, 0, W, H); }
     if (this.glitchT > 0) { c.fillStyle = 'rgba(255,255,255,0.06)'; for (let i = 0; i < 6; i++) c.fillRect(0, Math.random() * H, W, 2 + Math.random() * 6); }
+    if (this.isTP() && this.state === 'play') { const a = this.aimTP(), locked = Math.abs(((a - this.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > 0.001, d = this.cs.range * 0.85, q = this.proj(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 1.1), col = locked ? '#ff3d55' : 'rgba(255,255,255,0.85)', r = locked ? 12 + Math.sin(T * 10) * 2 : 9;
+      c.strokeStyle = col; c.lineWidth = 2; c.beginPath(); c.arc(q.x, q.y, r, 0, 6.28); c.stroke(); for (let i = 0; i < 4; i++) { const an = i * Math.PI / 2 + (locked ? T * 2 : 0); c.beginPath(); c.moveTo(q.x + Math.cos(an) * (r + 3), q.y + Math.sin(an) * (r + 3)); c.lineTo(q.x + Math.cos(an) * (r + 9), q.y + Math.sin(an) * (r + 9)); c.stroke(); } c.fillStyle = col; c.fillRect(q.x - 1.5, q.y - 1.5, 3, 3);
+      if (!this.touch && document.pointerLockElement !== this.cv) { c.font = '700 11px Unbounded,sans-serif'; c.textAlign = 'center'; c.fillStyle = 'rgba(255,255,255,0.75)'; c.fillText('Кликните, чтобы управлять камерой мышью', W / 2, H - 40); } }
     this.drawHUD(c, T);
   },
   s2w(x, y) { if (R3.on) return R3.pick(x, y); return{ x: (x - this.W / 2) / this.z + this.cam.x, y: (y - this.H / 2) / this.z + this.cam.y }; },
@@ -129,7 +133,9 @@ const G = {
     let x = 0, y = 0; const k = this.keys;
     if (k.KeyW || k.ArrowUp) y--; if (k.KeyS || k.ArrowDown) y++; if (k.KeyA || k.ArrowLeft) x--; if (k.KeyD || k.ArrowRight) x++;
     for (const id in this.touches) { const o = this.touches[id]; if (o.role === 'move') { const dx = o.x - o.ox, dy = o.y - o.oy, d = Math.hypot(dx, dy); if (d > 6) { const m = Math.min(1, d / 50); x = dx / d * m; y = dy / d * m; } } }
-    const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } return { x, y };
+    const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+    if (this.isTP()) { const yw = this.yaw || 0, fx = Math.cos(yw), fy = Math.sin(yw); return { x: -fy * x + fx * -y, y: fx * x + fy * -y }; }
+    return { x, y };
   },
 
   /* ---------- Запуск забега ---------- */
@@ -224,6 +230,7 @@ const G = {
     }
     if (evId) { const E = D.EVM[evId]; setTimeout(() => this.banner(E.n, E.c, 'СОБЫТИЕ', E.d), 1400); this.stat('events'); this.stat('ev_' + evId); }
     this.activeEvent = evId;
+    this.yaw = -Math.PI / 2; R3.cd = undefined;
     this.ms = null; if (!bossId) this.initMission(this.route); this.route = null; DynEv.reset(this); this.inAnom = false;
     this.cam.x = p.x; this.cam.y = p.y;
     this.explored = new Uint8Array(lv.W * lv.H);
@@ -541,7 +548,15 @@ const G = {
     if (this.boss) test(this.boss.x, this.boss.y, this.boss);
     return best;
   },
+  isTP() { return R3.on && R3.TP; },
+  aimTP() {
+    const p = this.p, yw = this.yaw || 0, rng = this.cs.range * 1.2 + 40; let best = null, bs = 1e9;
+    const test = (x, y, r) => { const d = Math.hypot(x - p.x, y - p.y); if (d > rng + r) return; const da = Math.abs(((Math.atan2(y - p.y, x - p.x) - yw + Math.PI * 3) % (Math.PI * 2)) - Math.PI); if (da > 0.38) return; const sc = d * (1 + da * 2.5); if (sc < bs) { bs = sc; best = { x, y }; } };
+    for (const e of this.enemies) if (!e.dead) test(e.x, e.y, e.r); if (this.boss) test(this.boss.x, this.boss.y, this.boss.r);
+    return best ? Math.atan2(best.y - p.y, best.x - p.x) : yw;
+  },
   aimAuto() {
+    if (this.isTP()) return this.aimTP();
     const t = this.nearestEnemy(this.cs.range * 1.15 + 40);
     if (t) return Math.atan2(t.y - this.p.y, t.x - this.p.x);
     for (const ch of this.chests) if (!ch.open) { }
@@ -552,7 +567,7 @@ const G = {
     if (this.rules.noAtk) { this.floatText(p.x, p.y - 30, 'Атака отключена', '#888'); return; }
     if (p.ammo < 1) return;
     if (ang === null || ang === undefined) ang = this.aimAuto();
-    p.ammo -= 1; p.ang = ang; p.shots++;
+    p.ammo -= 1; p.ang = ang; p.shots++; p.shotT = 0.45;
     const over = cs.fx.has('overclock') && p.shots % 4 === 0;
     let dmg = cs.dmg * (over ? 3 : 1);
     SFX.play('shoot');
@@ -734,7 +749,8 @@ const G = {
     this.updateTiles(dt); if (this.frame % 6 === 0) this.updateRooms(dt * 6);
     if (m.x || m.y) { p.still = 0; if (!this.mouse.down) p.ang = Math.atan2(m.y, m.x); } else { p.still += dt; if (p.still > 30 && !p.afk) { p.afk = true; this.stat('afk'); } }
     this.collide(p);
-    if (!this.touch) { const w = this.s2w(this.mouse.x, this.mouse.y); this.mouse.wx = w.x; this.mouse.wy = w.y; if (this.mouse.down) { p.ang = Math.atan2(w.y - p.y, w.x - p.x); if (!this.fireCd || this.fireCd <= 0) { if (p.ammo >= 1) { this.fire(p.ang); this.fireCd = 0.18; } } } }
+    p.shotT = (p.shotT || 0) - dt; if (this.isTP() && p.shotT > 0) p.ang = this.aimTP(); else if (this.isTP() && !(m.x || m.y)) { const da = ((this.yaw - p.ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI; p.ang += da * Math.min(1, dt * 8); }
+    if (!this.touch) { const w = this.isTP() ? { x: p.x + Math.cos(this.yaw) * 300, y: p.y + Math.sin(this.yaw) * 300 } : this.s2w(this.mouse.x, this.mouse.y); this.mouse.wx = w.x; this.mouse.wy = w.y; if (this.mouse.down) { p.ang = this.isTP() ? this.aimTP() : Math.atan2(w.y - p.y, w.x - p.x); if (!this.fireCd || this.fireCd <= 0) { if (p.ammo >= 1) { this.fire(p.ang); this.fireCd = 0.18; } } } }
     this.fireCd = (this.fireCd || 0) - dt;
     // таймеры
     p.inv -= dt; p.dashCd -= dt;
@@ -1105,6 +1121,9 @@ const G = {
     if (this.slowT > 0) { c.fillStyle = 'rgba(80,120,255,0.1)'; c.fillRect(0, 0, W, H); }
     if (this.hurtFlash > 0) { c.fillStyle = 'rgba(255,0,60,' + this.hurtFlash * 0.7 + ')'; c.fillRect(0, 0, W, H); }
     if (this.glitchT > 0 || this.ev.chaos && Math.random() < 0.02) { for (let i = 0; i < 5; i++) { const y = Math.random() * H, h = 8 + Math.random() * 30; c.drawImage(this.cv, 0, y * dpr, W * dpr, h * dpr, (Math.random() - 0.5) * 34, y, W, h); } }
+    if (this.isTP() && this.state === 'play') { const a = this.aimTP(), locked = Math.abs(((a - this.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > 0.001, d = this.cs.range * 0.85, q = this.proj(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 1.1), col = locked ? '#ff3d55' : 'rgba(255,255,255,0.85)', r = locked ? 12 + Math.sin(T * 10) * 2 : 9;
+      c.strokeStyle = col; c.lineWidth = 2; c.beginPath(); c.arc(q.x, q.y, r, 0, 6.28); c.stroke(); for (let i = 0; i < 4; i++) { const an = i * Math.PI / 2 + (locked ? T * 2 : 0); c.beginPath(); c.moveTo(q.x + Math.cos(an) * (r + 3), q.y + Math.sin(an) * (r + 3)); c.lineTo(q.x + Math.cos(an) * (r + 9), q.y + Math.sin(an) * (r + 9)); c.stroke(); } c.fillStyle = col; c.fillRect(q.x - 1.5, q.y - 1.5, 3, 3);
+      if (!this.touch && document.pointerLockElement !== this.cv) { c.font = '700 11px Unbounded,sans-serif'; c.textAlign = 'center'; c.fillStyle = 'rgba(255,255,255,0.75)'; c.fillText('Кликните, чтобы управлять камерой мышью', W / 2, H - 40); } }
     this.drawHUD(c, T);
   },
   glow(c, col, b) { if (b) { c.shadowColor = col; c.shadowBlur = b; } else c.shadowBlur = 0; },
