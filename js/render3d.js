@@ -903,6 +903,52 @@ const R3 = {
     if (this.composer && this.lvl === 0 && this.TP) this.composer.render(); else this.r.render(this.scene, this.cam);
   },
 
+  /* ---------- ангар: 3D-сцена лобби на весь экран ---------- */
+  buildHangar() {
+    const T3 = THREE, sc = this.hs = new T3.Scene(); sc.fog = new T3.Fog(0x07080c, 10, 30); sc.environment = this.envMap || null; sc.background = new T3.Color(0x07080c);
+    this.hcam = new T3.PerspectiveCamera(42, 1, 0.1, 80);
+    sc.add(new T3.HemisphereLight(0xb8c4ff, 0x302820, 0.35));
+    const key = this.hKey = new T3.SpotLight(0xfff0dc, 2.6, 18, 0.42, 0.55, 1.2); key.position.set(0, 7.5, 1.2); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0005; key.target.position.set(0, 0, 0); sc.add(key); sc.add(key.target);
+    const rim = this.hRim = new T3.PointLight(0x00f0ff, 1.4, 7, 2); rim.position.set(-1.6, 2.2, -1.8); sc.add(rim);
+    const fill = new T3.PointLight(0xffa860, 0.7, 10, 2); fill.position.set(3, 1.5, 3); sc.add(fill);
+    // пол и стены
+    const fm = AS.mat('concrete_floor_worn_001', 6); const floor = new T3.Mesh(new T3.PlaneGeometry(30, 30), fm); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
+    const wm = AS.mat('rusty_corrugated_iron', 3, '#8a8f9a');
+    for (let i = -3; i <= 3; i++) { const a = i * 0.32, r = 9, w = new T3.Mesh(new T3.BoxGeometry(3.1, 7, 0.3), wm); w.position.set(Math.sin(a) * r, 3.5, -Math.cos(a) * r); w.rotation.y = -a; w.receiveShadow = true; sc.add(w); }
+    const bm = AS.mat('metal_plate_02', 2, '#5a5d66'); for (let i = -3; i <= 3; i++) { const a = i * 0.32 + 0.16, r = 8.7, b = new T3.Mesh(new T3.BoxGeometry(0.35, 7, 0.45), bm); b.position.set(Math.sin(a) * r, 3.5, -Math.cos(a) * r); b.rotation.y = -a; b.castShadow = true; sc.add(b); }
+    // платформа
+    const pm = AS.mat('metal_plate', 1.5); const pl = new T3.Mesh(new T3.CylinderGeometry(1.35, 1.5, 0.22, 48), pm); pl.position.y = 0.11; pl.receiveShadow = true; pl.castShadow = true; sc.add(pl);
+    this.hRing = new T3.Mesh(new T3.TorusGeometry(1.42, 0.025, 8, 80), new T3.MeshBasicMaterial({ color: 0x00f0ff })); this.hRing.rotation.x = Math.PI / 2; this.hRing.position.y = 0.23; sc.add(this.hRing);
+    const ring2 = new T3.Mesh(new T3.TorusGeometry(1.52, 0.012, 8, 80), new T3.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 })); ring2.rotation.x = Math.PI / 2; ring2.position.y = 0.05; sc.add(ring2);
+    // световой конус прожектора
+    const cone = this.hCone = new T3.Mesh(new T3.ConeGeometry(1.9, 7.3, 48, 1, true), new T3.MeshBasicMaterial({ color: 0xfff0dc, transparent: true, opacity: 0.045, blending: T3.AdditiveBlending, depthWrite: false, side: T3.DoubleSide })); cone.position.y = 3.75; sc.add(cone);
+    const lampH = AS.one('hanging_industrial_lamp', 0.9); if (lampH) { lampH.position.set(0, 7.05, 1.2); sc.add(lampH); }
+    // пропы вокруг
+    const put = (id, h, x, z, ry = 0) => { const o = AS.one(id, h); if (!o) return; o.position.set(x, 0, z); o.rotation.y = ry; o.traverse(q => { if (q.isMesh) { q.castShadow = true; q.receiveShadow = true; } }); sc.add(o); };
+    put('old_military_crate', 0.6, -3.4, -2.2, 0.3); put('old_military_crate', 0.6, -3.5, -1.4, -0.2); put('Barrel_01', 1.0, 3.2, -2.6, 0); put('Barrel_01', 1.0, 3.9, -2.0, 1); put('worn_metal_rack', 2.2, -5.2, -4.4, 0.5); put('worn_metal_rack', 2.2, 5.4, -4.2, -0.5);
+    put('propane_tank', 1.1, 2.6, -3.6, 0.2); put('portable_generator', 0.8, -2.4, -3.8, 0.8); put('utility_box_01', 1.0, 4.6, -1.0, -1.2); put('industrial_pastic_container', 0.9, -4.6, -0.6, 0.9);
+    for (const [x, z] of [[-4, -5.5], [4, -5.5]]) { const l = AS.one('hanging_industrial_lamp', 0.8); if (l) { l.position.set(x, 6.3, z); sc.add(l); } const pl2 = new T3.PointLight(0xffc890, 0.9, 7, 2); pl2.position.set(x, 5.6, z); sc.add(pl2); }
+    // пыль в луче
+    const N = 140, g = new T3.BufferGeometry(), pos = new Float32Array(N * 3); for (let i = 0; i < N; i++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 1.8; pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = Math.random() * 6.5; pos[i * 3 + 2] = Math.sin(a) * r; }
+    g.setAttribute('position', new T3.BufferAttribute(pos, 3)); this.hDust = new T3.Points(g, new T3.PointsMaterial({ color: 0xffe8c8, size: 0.035, transparent: true, opacity: 0.55, blending: T3.AdditiveBlending, depthWrite: false })); sc.add(this.hDust);
+    this.hHeroKey = null;
+  },
+  hangar(T, dt) {
+    if (!this.ok || !window.AS || !AS.ready) return false;
+    if (!this.hs) this.buildHangar();
+    const s = P.s, H = D.HEROES.find(x => x.id === s.hero) || D.HEROES[0], sk = P.cos('skin').v, key = H.id + sk;
+    if (this.hHeroKey !== key) { if (this.hHero) this.hs.remove(this.hHero); this.hHero = this.heroModel(H, sk); this.hHero.userData.base.visible = false; this.hHero.position.y = 0.22; this.hHero.traverse(q => { if (q.isMesh) q.castShadow = true; }); this.hHero.scale.setScalar(1.25); this.hs.add(this.hHero); this.hHeroKey = key; this.hHeroT = 0; this.hRing.material.color.copy(this.C(H.col)); this.hRim.color.copy(this.C(H.col)); }
+    const hm = this.hHero, u = hm.userData; this.hHeroT += dt;
+    if (u.char) { AS.play(u.char, this.hHeroT < 1.2 ? ['Wave', 'Hello', 'Yes', 'Idle'] : ['Idle_Gun', 'Idle', 'Standing']); u.char.userData.mixer.update(dt); u.piv.rotation.y = -Math.PI / 2 + Math.sin(T * 0.35) * 0.35; } else { u.piv.rotation.y = T * 0.5; this.animHero(hm, T); }
+    this.hRing.rotation.z = T * 0.3; this.hCone.material.opacity = 0.04 + Math.sin(T * 1.7) * 0.008;
+    const dp = this.hDust.geometry.attributes.position; for (let i = 0; i < dp.count; i++) { let y = dp.getY(i) + dt * 0.08; if (y > 6.5) y = 0; dp.setY(i, y); } dp.needsUpdate = true; this.hDust.rotation.y = T * 0.03;
+    // камера: медленный облёт, на портрете ближе и выше
+    const asp = innerWidth / innerHeight, por = asp < 0.8, a = Math.sin(T * 0.12) * 0.32, r = por ? 8.6 : 9.2 / Math.min(1.3, Math.max(0.85, asp)), hh = por ? 2.2 : 2.0;
+    this.hcam.fov = por ? 55 : 40; this.hcam.aspect = asp; this.hcam.updateProjectionMatrix();
+    this.hcam.position.set(Math.sin(a) * r, hh, Math.cos(a) * r); this.hcam.lookAt(0, por ? 1.05 : 1.45, 0);
+    this.r.render(this.hs, this.hcam);
+    return true;
+  },
   /* ---------- лобби: 3D-боец на постаменте ---------- */
   lobby(cv, H, skin, lock, T) {
     if (!this.ok) return false;

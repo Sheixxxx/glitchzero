@@ -22,7 +22,8 @@
   const rs = () => { bg.width = innerWidth; bg.height = innerHeight; pts = Array.from({ length: Math.min(70, innerWidth / 12) }, () => ({ x: Math.random() * bg.width, y: Math.random() * bg.height, v: 0.2 + Math.random() * 0.6, s: Math.random() * 2 + 0.5, h: Math.random() < 0.5 ? 270 : 185 })); };
   rs(); addEventListener('resize', rs);
   (function loop() {
-    requestAnimationFrame(loop); if (G.state !== 'off') return;
+    requestAnimationFrame(loop); if (G.state !== 'off') { document.body.classList.remove('hangar'); return; }
+    { const now = performance.now() / 1000, hdt = Math.min(0.05, now - (loop.lt || now)); loop.lt = now; const useH = R3.ok && window.AS && AS.ready && P.s.settings.r3d !== false; document.body.classList.toggle('hangar', !!useH); if (useH && R3.hangar(now, hdt)) return; }
     const W = bg.width, H = bg.height, T = performance.now() / 1000, hz = H * 0.58;
     const cs = getComputedStyle(document.documentElement), a1 = cs.getPropertyValue('--a1').trim() || '#7b3dff', a2 = cs.getPropertyValue('--a2').trim() || '#00f0ff';
     const sky = c.createLinearGradient(0, 0, 0, hz); sky.addColorStop(0, '#03020a'); sky.addColorStop(1, '#12072a'); c.fillStyle = sky; c.fillRect(0, 0, W, hz);
