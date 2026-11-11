@@ -570,7 +570,6 @@ const G = {
     p.ammo -= 1; p.ang = ang; p.shots++; p.shotT = 0.45; this.fx({ k: 'muzzle', a: ang, col: H.col });
     const over = cs.fx.has('overclock') && p.shots % 4 === 0;
     let dmg = cs.dmg * (over ? 3 : 1);
-    SFX.play('shoot');
     const A = H.atk;
     if (A.t === 'wave') {
       const arc = A.spr + (cs.fx.has('multi') ? 0.5 : 0), rng = cs.range;
@@ -646,12 +645,11 @@ const G = {
       }
     }
     this.floatText(e.x + (Math.random() - 0.5) * 16, e.y - e.r, Math.round(dmg) + (c ? '!' : ''), c ? '#ffd23d' : '#fff', c ? 1.3 : 1);
-    SFX.play('hit');
     if (e.hp <= 0) this.killEnemy(e);
   },
   killEnemy(e, silent) {
     if (e.dead) return; e.dead = true; const R = this.run, d = D.EN[e.type]; this.fx({ k: 'die', e, x: e.x, y: e.y, col: e.col });
-    this.burst(e.x, e.y, e.col, 16, 260); SFX.play('kill');
+    this.burst(e.x, e.y, e.col, 16, 260);
     if (e.type === 'glitch') { this.stat('glitchKills'); P.s.gems += 25; this.banner('ГЛЮК ПОЙМАН!', '#ffd700', '+25 осколков'); for (let i = 0; i < 20; i++) this.dropCoin(e.x, e.y, 3); R.loot.push(P.rollItem(0.5, 3)); }
     R.kills++; this.stat('kills'); this.stat('k_' + e.type); if (e.type === 'guard' || e.elite) this.stat('eliteKills');
     if (e.elite) { this.banner('ЭЛИТА ПОВЕРЖЕНА', '#ffd23d', 'НАГРАДА', '+15 осколков и предмет'); P.s.gems += 15; for (let i = 0; i < 14; i++) this.dropCoin(e.x, e.y, 3); R.loot.push(P.rollItem(0.4 + this.cs.luck, 2)); this.pick.push({ k: 'heal', x: e.x, y: e.y, t: 0 }); this.shake(10); this.burst(e.x, e.y, '#ffd23d', 60, 420); this.vfx.push({ k: 'ring', x: e.x, y: e.y, r: 160, t: 0, d: 0.6, col: '#ffd23d' }); }
@@ -696,14 +694,14 @@ const G = {
     if (!this.rules.noHeal) this.pick.push({ k: 'heal', x: b.x + 40, y: b.y });
   },
   damageWall(tx, ty, dmg) { const k = tx + ',' + ty; const tv = this.lv.t[ty * this.lv.W + tx]; this.crack[k] = (this.crack[k] || (tv === 3 ? 28 : tv === 6 ? 15 : 70 + this.diff * 4)) - dmg; this.burst((tx + 0.5) * TS, (ty + 0.5) * TS, '#fff', 3, 120); if (this.crack[k] <= 0) this.breakWall(tx, ty); },
-  fx(o) { (this.fxq = this.fxq || []).push(o); if (this.fxq.length > 120) this.fxq.shift(); },
+  fx(o) { (this.fxq = this.fxq || []).push(o); if (this.fxq.length > 120) this.fxq.shift(); SFX.fx(o, this); },
   explode(x, y, r, dmg, hostile) {
     this.fx({ k: 'boom', x, y, r, hostile });
-    this.burst(x, y, hostile ? '#ff8a00' : '#ffd23d', 30, 360); this.vfx.push({ k: 'ring', x, y, r, t: 0, d: 0.3, col: hostile ? '#ff8a00' : '#ffd23d' }); SFX.play('boom'); this.shake(6);
+    this.burst(x, y, hostile ? '#ff8a00' : '#ffd23d', 30, 360); this.vfx.push({ k: 'ring', x, y, r, t: 0, d: 0.3, col: hostile ? '#ff8a00' : '#ffd23d' }); this.shake(6);
     if (hostile) { if (Math.hypot(this.p.x - x, this.p.y - y) < r + this.p.r) this.hurtPlayer(dmg, null); }
     else for (const e of this.enemies.slice()) if (!e.dead && Math.hypot(e.x - x, e.y - y) < r + e.r) this.hurtEnemy(e, dmg, { noFx: true });
   },
-  ebullet(x, y, a, sp, dmg) { const sl = this.ev.slowmo ? 0.7 : 1; this.eb.push({ x, y, vx: Math.cos(a) * sp * sl, vy: Math.sin(a) * sp * sl, r: 6, dmg, life: 4 }); },
+  ebullet(x, y, a, sp, dmg) { SFX.enemyShot(x, y, this); const sl = this.ev.slowmo ? 0.7 : 1; this.eb.push({ x, y, vx: Math.cos(a) * sp * sl, vy: Math.sin(a) * sp * sl, r: 6, dmg, life: 4 }); },
   hurtPlayer(dmg, src) {
     const p = this.p; if (p.inv > 0 || this.state !== 'play') return;
     if (Math.random() < this.cs.dodge) { this.floatText(p.x, p.y - 26, 'УКЛОН', '#3dffa0'); p.inv = 0.3; return; }
@@ -748,7 +746,7 @@ const G = {
       if (p.superDash && this.boss && !p.sdHit.has(this.boss) && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < this.boss.r + p.r + 14) { p.sdHit.add(this.boss); this.hurtBoss(p.superDash); }
       if (p.dashT <= 0) p.superDash = 0;
     } else { const bs = (p.boostT > 0 ? 1.7 : 1) * (this.featSlow || 1) * (p.chill > 0 ? 0.6 : 1); let vx = m.x * cs.spd * bs, vy = m.y * cs.spd * bs; if (this.onIce) { const k = Math.min(1, dt * 2.2); p.ivx = (p.ivx || 0) + (vx - (p.ivx || 0)) * k; p.ivy = (p.ivy || 0) + (vy - (p.ivy || 0)) * k; vx = p.ivx; vy = p.ivy; if ((Math.abs(vx) > 40 || Math.abs(vy) > 40) && this.frame % 3 === 0) this.trailP(p.x, p.y, '#cfefff'); } else { p.ivx = vx; p.ivy = vy; } p.x += vx * dt; p.y += vy * dt; if (p.boostT > 0 && this.frame % 2 === 0) this.trailP(p.x, p.y, '#00f0ff'); }
-    p.chill = (p.chill || 0) - dt; this.updFeats(dt); Relic.tick(this, dt); DynEv.tick(this, dt); if (this.relCard) { this.relCard.t += dt; if (this.relCard.t > 3.2) this.relCard = null; }
+    p.chill = (p.chill || 0) - dt; this.updFeats(dt); SFX.steps(this, dt, !!(m.x || m.y) && p.dashT <= 0, /station|circuit|grid|factory|core/.test(this.lv.biome.id)); Relic.tick(this, dt); DynEv.tick(this, dt); if (this.relCard) { this.relCard.t += dt; if (this.relCard.t > 3.2) this.relCard = null; }
     this.updateTiles(dt); if (this.frame % 6 === 0) this.updateRooms(dt * 6);
     if (m.x || m.y) { p.still = 0; if (!this.mouse.down) p.ang = Math.atan2(m.y, m.x); } else { p.still += dt; if (p.still > 30 && !p.afk) { p.afk = true; this.stat('afk'); } }
     this.collide(p);
