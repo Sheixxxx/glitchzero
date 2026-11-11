@@ -357,3 +357,33 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;b
 .confetti{position:fixed;inset:0;pointer-events:none;z-index:9998}
 
 @media (max-width:560px){#pauseBtn{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 8px);width:38px;height:38px}}
+
+/* ===== Лобби-ангар: реалистичный стиль (матовое стекло) ===== */
+body.hangar #gl{display:block}
+body.hangar #bg{display:none}
+body.hangar{--glass:rgba(12,14,20,.46);--glass2:rgba(18,20,28,.62);--gl-ln:rgba(255,255,255,.13);--txt:#e9ebf2}
+body.hangar #ui{background:transparent}
+body.hangar .lobby .stage .herocv{visibility:hidden}
+body.hangar .lobby{background:linear-gradient(180deg,rgba(5,6,10,.55),transparent 22%,transparent 62%,rgba(5,6,10,.8))}
+body.hangar .prof,body.hangar .res .r,body.hangar .hsub span,body.hangar .roadmini,body.hangar .modebtn,body.hangar .casebtn,body.hangar .row,body.hangar .mcard,body.hangar .hcard,body.hangar .acard,body.hangar .qcard,body.hangar .scard,body.hangar .stc,body.hangar .pcard,body.hangar .bcard,body.hangar .set,body.hangar .chip{background:var(--glass)!important;-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);box-shadow:inset 0 0 0 1px var(--gl-ln)!important}
+body.hangar .row::after,body.hangar .mcard::after,body.hangar .hcard::after,body.hangar .acard::after,body.hangar .qcard::after,body.hangar .scard::after,body.hangar .stc::after,body.hangar .pcard::after,body.hangar .bcard::after,body.hangar .set::after{opacity:.35}
+body.hangar .chip.on{background:rgba(255,255,255,.88)!important;color:#0b0c10!important;box-shadow:none!important}
+body.hangar .sb{color:var(--txt);font-weight:600;letter-spacing:.8px}
+body.hangar .sb i{clip-path:none;width:50px;height:50px;border-radius:14px;background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:inset 0 0 0 1px var(--gl-ln),0 8px 24px rgba(0,0,0,.35)}
+body.hangar .sb i::before{display:none}
+body.hangar .sb i svg{filter:none;color:#fff;opacity:.92}
+body.hangar .sb:hover i{background:rgba(255,255,255,.14)}
+body.hangar .glyph-logo{font-size:clamp(20px,5.2vw,34px);letter-spacing:6px;text-shadow:0 2px 18px rgba(0,0,0,.6);animation:none}
+body.hangar .glyph-logo::before,body.hangar .glyph-logo::after{opacity:.25}
+body.hangar .glyph-logo span{color:#fff;text-shadow:none;opacity:.55}
+body.hangar .logosub{color:rgba(255,255,255,.55);letter-spacing:8px}
+body.hangar .hname{text-shadow:0 2px 20px rgba(0,0,0,.7);letter-spacing:5px;font-size:24px}
+body.hangar .hsub span{color:var(--txt);clip-path:none;border-radius:8px}
+body.hangar .prof,body.hangar .res .r,body.hangar .roadmini,body.hangar .modebtn,body.hangar .casebtn{clip-path:none;border-radius:12px}
+body.hangar .av::before{clip-path:circle(50%)}body.hangar .av::after{clip-path:circle(50%);background:radial-gradient(circle at 35% 30%,#3a3f4c,#14161d)}
+body.hangar .play{clip-path:none;border-radius:14px;background:linear-gradient(180deg,#ffd76a,#f0a020);box-shadow:0 10px 30px rgba(240,160,32,.35),inset 0 -4px 0 rgba(120,60,0,.35),inset 0 2px 0 rgba(255,255,255,.55);letter-spacing:4px}
+body.hangar .head,body.hangar .hdr{background:linear-gradient(180deg,rgba(6,7,11,.8),rgba(6,7,11,.35));-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+body.hangar .btn{border-radius:10px;clip-path:none}
+body.hangar #modal .box,body.hangar #modal>div{-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+body.hangar .lobby .hname{margin-top:clamp(40px,9vh,90px)}
+@media (max-width:560px){body.hangar .lobby .hname{margin-top:4px}}
