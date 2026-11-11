@@ -17,7 +17,7 @@ const R3 = {
       this.lampL = []; for (let i = 0; i < 4; i++) { const l = new T3.PointLight(0xffd9a0, 0, 9, 2); this.scene.add(l); this.lampL.push(l); }
       this.pl = new T3.PointLight(0x00f0ff, 0.7, 7, 2); this.scene.add(this.pl);
       this.dummy = new T3.Object3D(); this.cols = {}; this.mats = {};
-      this.initPoints(); this.initPools();
+      this.initPoints(); this.initPools(); this.initFX();
       this.ok = true; this.resize();
       addEventListener('resize', () => this.resize());
       if (window.AS) AS.load();
@@ -74,6 +74,57 @@ const R3 = {
     if (this.pn >= (this.pBud || this.PN)) return; const i = this.pn++, c = this.C(col);
     this.pPos[i * 3] = x; this.pPos[i * 3 + 1] = y; this.pPos[i * 3 + 2] = z;
     this.pCol[i * 3] = c.r; this.pCol[i * 3 + 1] = c.g; this.pCol[i * 3 + 2] = c.b; this.pSize[i] = size; this.pA[i] = a;
+  },
+  /* ---------- реалистичные эффекты: искры, дым, свет, трассеры ---------- */
+  initFX() {
+    const T3 = THREE;
+    this.sp = []; this.sm = [];
+    const N = this.SMN = 260, g = new T3.BufferGeometry();
+    this.smPos = new Float32Array(N * 3); this.smSize = new Float32Array(N); this.smA = new Float32Array(N); this.smCol = new Float32Array(N * 3);
+    g.setAttribute('position', new T3.BufferAttribute(this.smPos, 3)); g.setAttribute('size', new T3.BufferAttribute(this.smSize, 1)); g.setAttribute('alpha', new T3.BufferAttribute(this.smA, 1)); g.setAttribute('color', new T3.BufferAttribute(this.smCol, 3));
+    this.smMat = new T3.ShaderMaterial({ uniforms: { uS: { value: 600 } }, transparent: true, depthWrite: false,
+      vertexShader: 'attribute float size;attribute float alpha;attribute vec3 color;varying float vA;varying vec3 vC;uniform float uS;void main(){vA=alpha;vC=color;vec4 mv=modelViewMatrix*vec4(position,1.0);gl_PointSize=size*uS/-mv.z;gl_Position=projectionMatrix*mv;}',
+      fragmentShader: 'varying float vA;varying vec3 vC;void main(){vec2 p=gl_PointCoord-0.5;float d=length(p)*2.0;float n=sin(p.x*13.0+p.y*7.0)*0.08;float a=(1.0-smoothstep(0.3+n,1.0,d))*vA;gl_FragColor=vec4(vC,a*0.75);}' });
+    this.smoke = new T3.Points(g, this.smMat); this.smoke.frustumCulled = false; this.scene.add(this.smoke);
+    this.flashL = []; for (let i = 0; i < 3; i++) { const l = new T3.PointLight(0xffaa55, 0, 8, 2); this.scene.add(l); this.flashL.push({ l, t: 0, d: 1, i0: 0 }); }
+    const tg = new T3.CylinderGeometry(0.035, 0.035, 1, 6, 1, true); tg.rotateX(Math.PI / 2);
+    this.iTr = new T3.InstancedMesh(tg, new T3.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: T3.AdditiveBlending, depthWrite: false }), 400); this.iTr.instanceColor = new T3.InstancedBufferAttribute(new Float32Array(400 * 3).fill(1), 3); this.iTr.count = 0; this.iTr.frustumCulled = false; this.iTr.instanceMatrix.setUsage(T3.DynamicDrawUsage); this.scene.add(this.iTr);
+    this.iTrE = new T3.InstancedMesh(tg, new T3.MeshBasicMaterial({ color: 0xff3050, transparent: true, opacity: 0.95, blending: T3.AdditiveBlending, depthWrite: false }), 600); this.iTrE.count = 0; this.iTrE.frustumCulled = false; this.iTrE.instanceMatrix.setUsage(T3.DynamicDrawUsage); this.scene.add(this.iTrE);
+    this.dying = [];
+  },
+  flash(x, y, z, col, inten, dist, dur) {
+    const left = o => o.t >= o.d ? 0 : o.i0 * (1 - o.t / o.d); let s = this.flashL[0]; for (const o of this.flashL) if (left(o) < left(s)) s = o; if (left(s) > inten) return;
+    s.l.position.set(x, y, z); s.l.color.copy(this.C(col)); s.l.distance = dist; s.t = 0; s.d = dur; s.i0 = inten;
+  },
+  spark(x, y, z, vx, vy, vz, col, life, size, grav = 9) { if (this.sp.length < 500) this.sp.push({ x, y, z, vx, vy, vz, col, life, t: 0, size, grav }); },
+  puff(x, y, z, vx, vy, vz, col, life, s0, s1, a0) { if (this.sm.length < this.SMN) this.sm.push({ x, y, z, vx, vy, vz, c: this.C(col), life, t: 0, s0, s1, a0 }); },
+  fxFrame(G, dt, T) {
+    const R = Math.random, q = G.fxq || []; G.fxq = [];
+    const hh = this.TP ? 1.15 : 0.55;
+    for (const f of q) {
+      const x = (f.x || 0) / TS, z = (f.y || 0) / TS;
+      if (f.k === 'muzzle') { const p = G.p, a = f.a, mx = p.x / TS + Math.cos(a) * 0.55, mz = p.y / TS + Math.sin(a) * 0.55; this.flash(mx, hh + 0.1, mz, '#ffd9a0', 1.3, 4, 0.06); for (let i = 0; i < 5; i++) this.spark(mx, hh, mz, Math.cos(a) * (3 + R() * 4) + (R() - 0.5) * 2, R() * 1.5, Math.sin(a) * (3 + R() * 4) + (R() - 0.5) * 2, i < 2 ? '#ffffff' : f.col, 0.12, 0.25, 0); this.puff(mx, hh, mz, Math.cos(a) * 0.8, 0.4, Math.sin(a) * 0.8, '#9a9aa8', 0.5, 0.15, 0.5, 0.25); }
+      else if (f.k === 'hit') { const y = Math.max(0.5, Math.min(1.6, (f.h || 1) * 0.6)), n = f.big ? 14 : 8; for (let i = 0; i < n; i++) { const a = R() * 6.28, s = 2 + R() * 4; this.spark(x, y, z, Math.cos(a) * s, 1 + R() * 3, Math.sin(a) * s, i % 3 ? '#ffcf70' : f.col, 0.25 + R() * 0.3, 0.12 + R() * 0.1); } this.flash(x, y, z, f.big ? '#ffffff' : '#ffb060', f.big ? 2 : 1.1, 4, 0.08); if (f.big) this.puff(x, y, z, 0, 0.6, 0, '#5a5a66', 0.7, 0.2, 0.9, 0.35); }
+      else if (f.k === 'wall') { const vl = Math.hypot(f.vx, f.vy) || 1, nx = -f.vx / vl, nz = -f.vy / vl; for (let i = 0; i < 7; i++) this.spark(x, hh, z, nx * (1 + R() * 3) + (R() - 0.5) * 3, R() * 3, nz * (1 + R() * 3) + (R() - 0.5) * 3, i % 2 ? '#ffe0a0' : '#ffffff', 0.2 + R() * 0.25, 0.1); this.puff(x, hh, z, nx * 0.5, 0.3, nz * 0.5, '#8a8478', 0.8, 0.15, 0.7, 0.4); this.flash(x, hh, z, '#ffd090', 0.9, 3, 0.05); }
+      else if (f.k === 'boom') { const r = (f.r || 80) / TS; this.flash(x, 1.2, z, '#ff8a30', 4.5, r * 3 + 4, 0.35); for (let i = 0; i < 26; i++) { const a = R() * 6.28, s = 2 + R() * 7 * Math.min(1.5, r); this.spark(x, 0.4, z, Math.cos(a) * s, 2 + R() * 6, Math.sin(a) * s, i % 3 ? '#ffb040' : '#ffffff', 0.4 + R() * 0.5, 0.18 + R() * 0.15); }
+        for (let i = 0; i < 9; i++) { const a = R() * 6.28, d = R() * r * 0.6; this.puff(x + Math.cos(a) * d, 0.3 + R() * 0.6, z + Math.sin(a) * d, Math.cos(a) * 0.8, 0.9 + R() * 0.8, Math.sin(a) * 0.8, '#3a3634', 1.6 + R() * 0.8, r * 0.6, r * 1.8, 0.7); }
+        for (let i = 0; i < 6; i++) { const a = R() * 6.28; this.puff(x + Math.cos(a) * 0.3, 0.5 + R() * 0.5, z + Math.sin(a) * 0.3, Math.cos(a) * 1.5, 1.2, Math.sin(a) * 1.5, i % 2 ? '#ff7a20' : '#ffc040', 0.35, r * 0.5, r * 1.2, 0.9); }
+        this.fireB = (this.fireB || []); this.fireB.push({ x, z, r, t: 0 }); }
+      else if (f.k === 'die') { const e = f.e, m = this.models && this.models.get(e); for (let i = 0; i < 18; i++) { const a = R() * 6.28, s = 1.5 + R() * 4; this.spark(x, 0.8, z, Math.cos(a) * s, 1.5 + R() * 4, Math.sin(a) * s, i % 2 ? e.col : '#ffffff', 0.4 + R() * 0.4, 0.15); } this.puff(x, 0.6, z, 0, 0.7, 0, '#4a4a55', 1.1, 0.3, 1.3, 0.5); this.flash(x, 1, z, e.col, 1.6, 5, 0.18);
+        if (m && m.userData.char) { this.models.delete(e); m.userData.dieT = 0; m.userData.e = e; this.dying.push(m); AS.play(m.userData.char, ['Death', 'Dead'], 0.08, true); if (m.userData.threat) m.userData.threat.visible = false; } }
+      else if (f.k === 'phit') { this.hurtK = 1; }
+    }
+    // искры
+    for (let i = this.sp.length - 1; i >= 0; i--) { const s = this.sp[i]; s.t += dt; if (s.t >= s.life) { this.sp.splice(i, 1); continue; } s.vy -= s.grav * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt; if (s.y < 0.02) { s.y = 0.02; s.vy *= -0.35; s.vx *= 0.6; s.vz *= 0.6; } const f = 1 - s.t / s.life; this.gp(s.x, s.y, s.z, s.col, s.size * (0.5 + f * 0.5), f); this.gp(s.x - s.vx * 0.02, s.y - s.vy * 0.02, s.z - s.vz * 0.02, s.col, s.size * 0.6, f * 0.5); }
+    // огненные шары
+    if (this.fireB) for (let i = this.fireB.length - 1; i >= 0; i--) { const b = this.fireB[i]; b.t += dt; if (b.t > 0.45) { this.fireB.splice(i, 1); continue; } const f = b.t / 0.45; this.gp(b.x, 0.6 + f * 0.8, b.z, '#ffb040', b.r * (1.2 + f * 2), 1 - f); this.gp(b.x, 0.5, b.z, '#ffffff', b.r * 0.9 * (1 - f), 1 - f); this.ring(b.x, b.z, b.r * (0.4 + f * 1.6), '#ffa040', 0.6 * (1 - f), 0.05); }
+    // дым
+    let n = 0; for (let i = this.sm.length - 1; i >= 0; i--) { const s = this.sm[i]; s.t += dt; if (s.t >= s.life) { this.sm.splice(i, 1); continue; } s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt; s.vx *= 0.97; s.vz *= 0.97; s.vy *= 0.985; const f = s.t / s.life; this.smPos[n * 3] = s.x; this.smPos[n * 3 + 1] = s.y; this.smPos[n * 3 + 2] = s.z; this.smSize[n] = s.s0 + (s.s1 - s.s0) * f; this.smA[n] = s.a0 * (f < 0.15 ? f / 0.15 : 1 - (f - 0.15) / 0.85); this.smCol[n * 3] = s.c.r; this.smCol[n * 3 + 1] = s.c.g; this.smCol[n * 3 + 2] = s.c.b; n++; }
+    const sg = this.smoke.geometry; sg.setDrawRange(0, n); for (const k of ['position', 'size', 'alpha', 'color']) sg.attributes[k].needsUpdate = true; this.smMat.uniforms.uS.value = this.pmat.uniforms.uS.value;
+    // вспышки света
+    for (const s of this.flashL) { s.t += dt; s.l.intensity = s.t < s.d ? s.i0 * (1 - s.t / s.d) : 0; }
+    // умирающие враги: анимация смерти, затем уходят в пол
+    for (let i = this.dying.length - 1; i >= 0; i--) { const m = this.dying[i], u = m.userData; u.dieT += dt; if (u.char) u.char.userData.mixer.update(dt); if (u.dieT > 1.4) m.position.y = -(u.dieT - 1.4) * 1.2; if (u.dieT > 2.4) { this.lvG.remove(m); this.dying.splice(i, 1); } }
   },
   /* ---------- пулы ---------- */
   initPools() {
@@ -364,7 +415,7 @@ const R3 = {
     if (!this.ok) return;
     const T3 = THREE, lv = G.lv, pal = G.pal;
     if (this.lvG) { this.scene.remove(this.lvG); this.lvG.traverse(o => { if (o.geometry && o.geometry !== this.discGeo && o.geometry !== this.planeGeo && o.geometry !== this.ringGeo) o.geometry.dispose && o.geometry.dispose(); }); }
-    const grp = this.lvG = new T3.Group(); this.scene.add(grp);
+    const grp = this.lvG = new T3.Group(); this.scene.add(grp); this.dying = []; this.sp = []; this.sm = []; this.fireB = [];
     this.scene.fog.color.set(0x05060a); const TP = this.TP = !!(window.AS && AS.ready); const BT = TP ? (AS.BIO[lv.biome.id] || AS.BIO.grid) : null; this.lampPos = [];
     // пол (текстура из 2D-рендера пола)
     const fs = Math.min(24, Math.floor(2048 / lv.W)); const fc = this.floorCv = this.floorCv || document.createElement('canvas'); fc.width = lv.W * fs; fc.height = lv.H * fs; this.fs = fs;
@@ -663,6 +714,7 @@ const R3 = {
       this.scene.fog.near = D * 0.9; this.scene.fog.far = D * 2.2;
       vis = (x, z, m = 3) => Math.abs(x - this.ct.x) < D * 0.75 * Math.max(1, asp) + m && Math.abs(z - this.ct.z) < D * 0.9 + m;
     }
+    this.fxFrame(G, dt, T);
     // игрок
     const sk = P.cos('skin').v;
     if (!this.heroG || this.lastSkin !== sk + cs.hero.id) { if (this.heroG) this.lvG.remove(this.heroG); this.heroG = this.heroModel(cs.hero, sk); this.lvG.add(this.heroG); this.lastSkin = sk + cs.hero.id; }
@@ -720,6 +772,13 @@ const R3 = {
     this.iPB.count = n; this.iPB.instanceMatrix.needsUpdate = true; if (this.iPB.instanceColor) this.iPB.instanceColor.needsUpdate = true;
     n = 0; for (const b of G.eb) { if (n >= 600) break; d.position.set(b.x / TS, 0.55, b.y / TS); d.scale.setScalar(1); d.updateMatrix(); this.iEB.setMatrixAt(n++, d.matrix); this.gp(b.x / TS, 0.55, b.y / TS, '#ff2850', 0.75, 0.9); }
     this.iEB.count = n; this.iEB.instanceMatrix.needsUpdate = true;
+    if (this.TP) {
+      this.iPB.count = 0; this.iEB.count = 0; let k = 0; const hh = 1.15;
+      for (const b of G.pb) { if (k >= 400) break; const sp = Math.hypot(b.vx, b.vy) || 1, L = Math.min(1.6, sp / TS * 0.045) * (b.orb ? 0.4 : 1), a = Math.atan2(b.vy, b.vx), x = b.x / TS - Math.cos(a) * L / 2, z = b.y / TS - Math.sin(a) * L / 2; d.position.set(x, hh, z); d.rotation.set(0, Math.PI / 2 - a, 0); const w = b.orb ? 4 : 1 + (b.r > 6 ? 0.8 : 0); d.scale.set(w, w, L); d.updateMatrix(); this.iTr.setMatrixAt(k, d.matrix); this.iTr.setColorAt(k, this.C(b.col)); k++; this.gp(b.x / TS, hh, b.y / TS, b.col, 0.45 * (b.orb ? 2.5 : 1), 0.9); this.gp(b.x / TS, hh, b.y / TS, '#ffffff', 0.18, 1); }
+      this.iTr.count = k; this.iTr.instanceMatrix.needsUpdate = true; if (this.iTr.instanceColor) this.iTr.instanceColor.needsUpdate = true;
+      k = 0; for (const b of G.eb) { if (k >= 600) break; const a = Math.atan2(b.vy, b.vx), L = Math.min(1.1, Math.hypot(b.vx, b.vy) / TS * 0.05), x = b.x / TS - Math.cos(a) * L / 2, z = b.y / TS - Math.sin(a) * L / 2; d.position.set(x, hh, z); d.rotation.set(0, Math.PI / 2 - a, 0); d.scale.set(1.8, 1.8, L); d.updateMatrix(); this.iTrE.setMatrixAt(k++, d.matrix); this.gp(b.x / TS, hh, b.y / TS, '#ff2850', 0.6, 0.9); }
+      this.iTrE.count = k; this.iTrE.instanceMatrix.needsUpdate = true;
+    } else { this.iTr.count = 0; this.iTrE.count = 0; }
     // подбираемое
     let nc = 0, nn = 0, nh = 0;
     for (const k of G.pick) {
